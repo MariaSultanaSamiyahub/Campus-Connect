@@ -13,7 +13,15 @@ const generateTransactionId = () => {
 exports.createTransaction = async (req, res) => {
   try {
     const { listingId, buyerId } = req.body;
-    const sellerId = req.user?.user_id || 'USER-001';
+    const sellerId = req.user?.user_id;
+
+    // Validate authentication
+    if (!sellerId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     if (!listingId || !buyerId) {
       return res.status(400).json({
@@ -96,7 +104,16 @@ exports.createTransaction = async (req, res) => {
 // @access  Private
 exports.getTransactions = async (req, res) => {
   try {
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const { type = 'all' } = req.query; // all, buyer, seller
 
     let filter = {};
@@ -137,7 +154,15 @@ exports.rateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
     const { rating, review } = req.body;
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
@@ -232,7 +257,15 @@ exports.rateTransaction = async (req, res) => {
 exports.getTransactionById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     const transaction = await Transaction.findOne({
       transaction_id: id,

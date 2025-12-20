@@ -1,4 +1,5 @@
 const { Conversation, Message } = require('../models/Message');
+const User = require('../models/User');
 
 // Generate unique IDs
 const generateConversationId = () => {
@@ -15,7 +16,15 @@ const generateMessageId = () => {
 exports.startConversation = async (req, res) => {
   try {
     const { otherUserId, listingId } = req.body;
-    const currentUserId = req.user?.user_id || 'USER-001';
+    const currentUserId = req.user?.user_id;
+
+    // Validate auth
+    if (!currentUserId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     if (!otherUserId) {
       return res.status(400).json({
@@ -41,6 +50,17 @@ exports.startConversation = async (req, res) => {
       });
     }
 
+    // Fetch both users for participant info
+    const currentUser = await User.findOne({ user_id: currentUserId });
+    const otherUser = await User.findOne({ user_id: otherUserId });
+
+    if (!otherUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Other user not found'
+      });
+    }
+
     // Create new conversation
     conversation = await Conversation.create({
       conversation_id: generateConversationId(),
@@ -50,13 +70,13 @@ exports.startConversation = async (req, res) => {
       participants: [
         {
           user_id: currentUserId,
-          name: req.user?.name || 'User 1',
-          email: req.user?.email || 'user1@example.com'
+          name: currentUser?.name || 'User',
+          email: currentUser?.email || 'unknown@example.com'
         },
         {
           user_id: otherUserId,
-          name: 'User 2', // This should come from database
-          email: 'user2@example.com'
+          name: otherUser.name || 'User',
+          email: otherUser.email || 'unknown@example.com'
         }
       ],
       unread_count: {
@@ -85,7 +105,14 @@ exports.startConversation = async (req, res) => {
 // @access  Private
 exports.getConversations = async (req, res) => {
   try {
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     const conversations = await Conversation.find({
       $or: [
@@ -116,7 +143,14 @@ exports.getConversations = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId, content } = req.body;
-    const senderId = req.user?.user_id || 'USER-001';
+    const senderId = req.user?.user_id;
+
+    if (!senderId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
 
     if (!conversationId || !content) {
       return res.status(400).json({
@@ -137,6 +171,9 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
+    // Get sender info
+    const sender = await User.findOne({ user_id: senderId });
+
     // Create message
     const message = await Message.create({
       message_id: generateMessageId(),
@@ -144,7 +181,7 @@ exports.sendMessage = async (req, res) => {
       sender_id: senderId,
       sender: {
         user_id: senderId,
-        name: req.user?.name || 'User'
+        name: sender?.name || 'User'
       },
       content,
       is_read: false
@@ -186,7 +223,15 @@ exports.sendMessage = async (req, res) => {
 exports.getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const { page = 1, limit = 50 } = req.query;
 
     // Verify user is part of conversation

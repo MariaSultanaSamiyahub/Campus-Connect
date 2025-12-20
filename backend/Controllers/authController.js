@@ -8,7 +8,7 @@ const generateUserId = () => {
 
 // Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'your-secret-key', {
+  return jwt.sign({ user_id: userId }, process.env.JWT_SECRET || 'your-secret-key', {
     expiresIn: '7d'
   });
 };
@@ -16,11 +16,12 @@ const generateToken = (userId) => {
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
+const bcrypt = require('bcryptjs');
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password, department, role } = req.body;
 
-    // Validation
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -28,7 +29,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Check if user exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
@@ -37,19 +37,21 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
+    // Hash password BEFORE saving
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     const user = await User.create({
       user_id: generateUserId(),
       name,
       email: email.toLowerCase(),
-      password_hash: password, // Will be hashed by pre-save hook
+      password_hash: hashedPassword, // Use hashed password
       department: department || '',
       role: role || 'buyer',
-      is_verified: true, // Auto-verify for development
+      is_verified: true,
       is_approved: true
     });
 
-    // Generate token
     const token = generateToken(user.user_id);
 
     res.status(201).json({
@@ -66,7 +68,7 @@ exports.register = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ Registration error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Server error during registration',

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/auth');
 const {
   createTransaction,
   getTransactions,
@@ -7,10 +8,10 @@ const {
   getTransactionById
 } = require('../controllers/transactionController');
 
-// All routes are protected (will need auth middleware later)
-router.post('/', createTransaction);
-router.get('/', getTransactions);
-router.get('/:id', getTransactionById);
-router.post('/:id/rate', rateTransaction);
+// All routes are protected
+router.post('/', protect, createTransaction);
+router.get('/', protect, getTransactions);
+router.get('/:id', protect, getTransactionById);
+router.post('/:id/rate', protect, rateTransaction);
 
 module.exports = router;

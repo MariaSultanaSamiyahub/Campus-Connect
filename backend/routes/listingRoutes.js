@@ -18,6 +18,6 @@ router.get('/:id', getListingById);
 router.post('/', protect, createListing);
 router.put('/:id', protect, updateListing);
 router.delete('/:id', protect, deleteListing);
-router.get('/my/listings', protect, getMyListings);
+router.get('/my-listings', protect, getMyListings);
 
 module.exports = router;

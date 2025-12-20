@@ -1,5 +1,5 @@
 const MarketplaceListing = require('../models/MarketplaceListing');
-const { v4: uuidv4 } = require('crypto');
+const User = require('../models/User');
 
 // Generate unique listing ID
 const generateListingId = () => {
@@ -21,6 +21,15 @@ exports.createListing = async (req, res) => {
       location
     } = req.body;
 
+    // Validate authentication
+    const sellerId = req.user?.user_id;
+    if (!sellerId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     // Validate required fields
     if (!title || !description || !category || !price) {
       return res.status(400).json({
@@ -29,14 +38,20 @@ exports.createListing = async (req, res) => {
       });
     }
 
-    // Get seller info from authenticated user (req.user)
-    // For now, using dummy data - replace with actual auth
-    const sellerId = req.user?.user_id || 'USER-001';
+    // Get seller info from database
+    const seller = await User.findOne({ user_id: sellerId });
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller not found'
+      });
+    }
+
     const sellerInfo = {
       user_id: sellerId,
-      name: req.user?.name || 'John Doe',
-      email: req.user?.email || 'john@example.com',
-      rating: req.user?.rating || 0
+      name: seller.name,
+      email: seller.email,
+      rating: seller.rating
     };
 
     const listing = await MarketplaceListing.create({
@@ -173,6 +188,16 @@ exports.getListingById = async (req, res) => {
 // @access  Private
 exports.updateListing = async (req, res) => {
   try {
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const listing = await MarketplaceListing.findOne({
       listing_id: req.params.id
     });
@@ -185,7 +210,6 @@ exports.updateListing = async (req, res) => {
     }
 
     // Check if user is the seller
-    const userId = req.user?.user_id || 'USER-001';
     if (listing.seller_id !== userId) {
       return res.status(403).json({
         success: false,
@@ -223,6 +247,16 @@ exports.updateListing = async (req, res) => {
 // @access  Private
 exports.deleteListing = async (req, res) => {
   try {
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
     const listing = await MarketplaceListing.findOne({
       listing_id: req.params.id
     });
@@ -235,7 +269,6 @@ exports.deleteListing = async (req, res) => {
     }
 
     // Check if user is the seller
-    const userId = req.user?.user_id || 'USER-001';
     if (listing.seller_id !== userId) {
       return res.status(403).json({
         success: false,
@@ -266,7 +299,15 @@ exports.deleteListing = async (req, res) => {
 // @access  Private
 exports.getMyListings = async (req, res) => {
   try {
-    const userId = req.user?.user_id || 'USER-001';
+    const userId = req.user?.user_id;
+
+    // Validate authentication
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
     
     const listings = await MarketplaceListing.find({
       seller_id: userId
