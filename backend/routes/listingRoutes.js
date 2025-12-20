@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/auth');
 const {
   createListing,
   getAllListings,
@@ -13,10 +14,10 @@ const {
 router.get('/', getAllListings);
 router.get('/:id', getListingById);
 
-// Protected routes (will need auth middleware later)
-router.post('/', createListing);
-router.put('/:id', updateListing);
-router.delete('/:id', deleteListing);
-router.get('/my/listings', getMyListings);
+// Protected routes
+router.post('/', protect, createListing);
+router.put('/:id', protect, updateListing);
+router.delete('/:id', protect, deleteListing);
+router.get('/my/listings', protect, getMyListings);
 
 module.exports = router;
