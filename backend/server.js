@@ -21,6 +21,7 @@ const authRoutes = require('./routes/authRoutes');
 const listingRoutes = require('./routes/listingRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
+const eventRoutes = require('./routes/eventRoutes'); // ✨ ADD THIS LINE
 
 // Test Route
 app.get('/api/test', (req, res) => {
@@ -32,6 +33,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/events', eventRoutes); // ✨ ADD THIS LINE
 
 // 404 Handler
 app.use((req, res) => {

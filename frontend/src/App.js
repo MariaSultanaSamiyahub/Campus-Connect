@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Home, MessageCircle, User, LogOut, Plus, Heart, MapPin, Eye, Trash2, Edit, ArrowRight } from 'lucide-react';
+import { Search, Home, MessageCircle, User, LogOut, Plus, Heart, MapPin, Eye, Trash2, Edit, Calendar, CalendarDays } from 'lucide-react';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -18,7 +18,7 @@ const styles = {
   heroSubtitle: { fontSize: '1.25rem', marginBottom: '2rem', opacity: 0.9 },
   searchBar: { display: 'flex', gap: '0.5rem', marginBottom: '1rem' },
   formInput: { width: '100%', border: '1px solid #d1d5db', borderRadius: '0.375rem', padding: '0.75rem', fontSize: '1rem', boxSizing: 'border-box' },
-  createBtn: { backgroundColor: '#22c55e', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', border: 'none', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  createBtn: { backgroundColor: '#22c55e', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '0.5rem', border: 'none', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' },
   categoryBtns: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap' },
   categoryBtn: { padding: '0.5rem 1rem', borderRadius: '9999px', border: 'none', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem' },
   categoryBtnActive: { backgroundColor: 'white', color: '#2563eb' },
@@ -52,6 +52,10 @@ const styles = {
   authCard: { backgroundColor: 'white', padding: '3rem', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', maxWidth: '450px', width: '100%' },
   authContainer: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' },
   linkBtn: { backgroundColor: 'transparent', color: '#2563eb', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem', fontWeight: '600' },
+  eventCard: { backgroundColor: 'white', borderRadius: '0.5rem', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+  eventCategory: { padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.75rem', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af', display: 'inline-block', marginBottom: '0.75rem' },
+  eventTitle: { fontSize: '1.25rem', fontWeight: 'bold', color: '#1e3a8a', marginBottom: '0.5rem' },
+  eventDetail: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' },
 };
 
 const getAuthHeaders = () => {
@@ -64,13 +68,17 @@ const getAuthHeaders = () => {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [authPage, setAuthPage] = useState('login'); // 'login' or 'register'
+  const [authPage, setAuthPage] = useState('login');
   const [listings, setListings] = useState([]);
   const [myListings, setMyListings] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [myEvents, setMyEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('');
+  const [eventCategory, setEventCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [loginEmail, setLoginEmail] = useState('');
@@ -87,13 +95,30 @@ export default function App() {
     condition: 'Good',
     location: 'Campus'
   });
+  const [eventFormData, setEventFormData] = useState({
+    title: '',
+    description: '',
+    date: '',
+    venue: '',
+    category: 'Other',
+    capacity: ''
+  });
 
   const categories = ['Books', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Sports', 'Other'];
   const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
+  const eventCategories = ['All', 'Academic', 'Cultural', 'Sports', 'Workshop', 'Seminar', 'Social', 'Other'];
 
   useEffect(() => {
     fetchListings();
   }, [searchQuery, category]);
+
+  useEffect(() => {
+    if (currentPage === 'events') {
+      fetchEvents();
+    } else if (currentPage === 'my-calendar') {
+      fetchMyEvents();
+    }
+  }, [currentPage, eventCategory]);
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -134,6 +159,39 @@ export default function App() {
     setLoading(false);
   };
 
+  const fetchEvents = async () => {
+    setLoading(true);
+    try {
+      let url = `${API_BASE}/events`;
+      if (eventCategory && eventCategory !== 'All') url += `?category=${eventCategory}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch events');
+      const data = await response.json();
+      setEvents(data.data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('error', '❌ Cannot fetch events');
+    }
+    setLoading(false);
+  };
+
+  const fetchMyEvents = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/events/my-events`, {
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch your events');
+      const data = await response.json();
+      setMyEvents(data.data || []);
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('error', '❌ Cannot fetch your events');
+    }
+    setLoading(false);
+  };
+
   const createListing = async () => {
     if (!formData.title || !formData.description || !formData.price) {
       showMessage('error', '⚠️ Please fill all required fields');
@@ -160,6 +218,88 @@ export default function App() {
     } catch (error) {
       console.error('Error:', error);
       showMessage('error', '❌ Error creating listing');
+    }
+    setLoading(false);
+  };
+
+  const createEvent = async () => {
+    if (!eventFormData.title || !eventFormData.description || !eventFormData.date || !eventFormData.venue) {
+      showMessage('error', '⚠️ Please fill all required fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        ...eventFormData,
+        capacity: eventFormData.capacity ? parseInt(eventFormData.capacity) : null
+      };
+
+      const response = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      
+      if (response.ok) {
+        showMessage('success', '✅ Event created successfully!');
+        setEventFormData({ title: '', description: '', date: '', venue: '', category: 'Other', capacity: '' });
+        setShowCreateEvent(false);
+        setCurrentPage('events');
+        fetchEvents();
+      } else {
+        const error = await response.json();
+        showMessage('error', `❌ ${error.message || 'Error creating event'}`);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('error', '❌ Error creating event');
+    }
+    setLoading(false);
+  };
+
+  const rsvpEvent = async (eventId, status) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/events/${eventId}/rsvp`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+      
+      if (response.ok) {
+        showMessage('success', `✅ RSVP ${status}!`);
+        fetchEvents();
+        fetchMyEvents();
+      } else {
+        const error = await response.json();
+        showMessage('error', `❌ ${error.message || 'Error with RSVP'}`);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('error', '❌ Error with RSVP');
+    }
+    setLoading(false);
+  };
+
+  const cancelRSVP = async (eventId) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/events/${eventId}/rsvp`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        showMessage('success', '✅ RSVP cancelled');
+        fetchEvents();
+        fetchMyEvents();
+      } else {
+        showMessage('error', '❌ Error cancelling RSVP');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      showMessage('error', '❌ Error cancelling RSVP');
     }
     setLoading(false);
   };
@@ -207,11 +347,12 @@ export default function App() {
       const data = await response.json();
 
       if (response.ok) {
+        localStorage.setItem('userId', data.user.id); // Store userId
         showMessage('success', '✅ Registration successful! Please login');
         setRegisterEmail('');
         setRegisterPassword('');
         setRegisterName('');
-        setAuthPage('login'); // Go back to login page
+        setAuthPage('login');
       } else {
         showMessage('error', `❌ ${data.message || 'Registration failed'}`);
       }
@@ -242,6 +383,7 @@ export default function App() {
 
       if (response.ok) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('userId', data.user.id); // Store userId
         setIsLoggedIn(true);
         setCurrentPage('home');
         setLoginEmail('');
@@ -258,9 +400,35 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('userId');
     setIsLoggedIn(false);
     setAuthPage('login');
     showMessage('success', '✅ Logged out');
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const checkUserRSVP = (event) => {
+    const userId = localStorage.getItem('userId');
+    return event.attendees?.find(
+      (attendee) => attendee.user === userId || attendee.user._id === userId
+    );
   };
 
   // LOGIN PAGE
@@ -393,6 +561,12 @@ export default function App() {
             <button onClick={() => { setCurrentPage('my-listings'); fetchMyListings(); }} style={{...styles.navButton, ...(currentPage === 'my-listings' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <User size={20} /> My Listings
             </button>
+            <button onClick={() => { setCurrentPage('events'); fetchEvents(); }} style={{...styles.navButton, ...(currentPage === 'events' ? styles.navButtonActive : styles.navButtonInactive)}}>
+              <Calendar size={20} /> Events
+            </button>
+            <button onClick={() => { setCurrentPage('my-calendar'); fetchMyEvents(); }} style={{...styles.navButton, ...(currentPage === 'my-calendar' ? styles.navButtonActive : styles.navButtonInactive)}}>
+              <CalendarDays size={20} /> My Calendar
+            </button>
             <button onClick={() => setCurrentPage('messages')} style={{...styles.navButton, ...(currentPage === 'messages' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <MessageCircle size={20} /> Messages
             </button>
@@ -403,6 +577,7 @@ export default function App() {
         </div>
       </nav>
 
+      {/* HOME PAGE */}
       {currentPage === 'home' && (
         <div>
           <div style={styles.hero}>
@@ -515,6 +690,7 @@ export default function App() {
         </div>
       )}
 
+      {/* MY LISTINGS PAGE */}
       {currentPage === 'my-listings' && (
         <div style={styles.pageContent}>
           <div style={styles.pageContainer}>
@@ -572,6 +748,183 @@ export default function App() {
         </div>
       )}
 
+      {/* EVENTS PAGE */}
+      {currentPage === 'events' && (
+        <div>
+          <div style={styles.hero}>
+            <div style={styles.heroContent}>
+              <h1 style={styles.heroTitle}>Campus Events</h1>
+              <p style={styles.heroSubtitle}>Discover and join events happening on campus</p>
+              
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={styles.categoryBtns}>
+                  {eventCategories.map(cat => (
+                    <button key={cat} onClick={() => setEventCategory(cat === 'All' ? '' : cat)} style={{...styles.categoryBtn, ...(eventCategory === (cat === 'All' ? '' : cat) ? styles.categoryBtnActive : styles.categoryBtnInactive)}}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowCreateEvent(true)} style={styles.createBtn}>
+                  <Plus size={20} /> Create Event
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {message.text && (
+            <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1rem', marginTop: '1rem' }}>
+              <div style={message.type === 'error' ? styles.errorMessage : styles.successMessage}>
+                {message.text}
+              </div>
+            </div>
+          )}
+
+          <div style={styles.listingsGrid}>
+            {loading ? (
+              <div style={styles.emptyState}>⏳ Loading...</div>
+            ) : events.length === 0 ? (
+              <div style={styles.emptyState}>
+                <div style={{ fontSize: '1rem' }}>📅 No events found</div>
+              </div>
+            ) : (
+              events.map(event => {
+                const userRSVP = checkUserRSVP(event);
+                return (
+                  <div key={event._id} style={styles.eventCard}>
+                    <div style={styles.eventCategory}>{event.category}</div>
+                    <h3 style={styles.eventTitle}>{event.title}</h3>
+                    <div style={styles.eventDetail}>📅 {formatDate(event.date)}</div>
+                    <div style={styles.eventDetail}>🕐 {formatTime(event.date)}</div>
+                    <div style={styles.eventDetail}>📍 {event.venue}</div>
+                    <div style={styles.eventDetail}>👤 {event.organizerName}</div>
+                    <p style={{ color: '#4b5563', marginTop: '0.75rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                      {event.description.substring(0, 100)}{event.description.length > 100 && '...'}
+                    </p>
+                    <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                        👥 {event.attendees?.length || 0} attending
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {userRSVP ? (
+                          <>
+                            <span style={{ padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', color: '#15803d', borderRadius: '0.375rem', fontSize: '0.85rem', fontWeight: '600' }}>
+                              {userRSVP.status === 'going' ? '✅ Going' : '⭐ Interested'}
+                            </span>
+                            <button onClick={() => cancelRSVP(event._id)} style={{ padding: '0.5rem 0.75rem', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} disabled={loading}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => rsvpEvent(event._id, 'interested')} style={{ padding: '0.5rem 0.75rem', backgroundColor: '#fef3c7', color: '#92400e', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} disabled={loading}>
+                              ⭐ Interested
+                            </button>
+                            <button onClick={() => rsvpEvent(event._id, 'going')} style={{ padding: '0.5rem 0.75rem', backgroundColor: '#22c55e', color: 'white', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} disabled={loading}>
+                              ✅ Going
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {showCreateEvent && (
+            <div style={styles.modal}>
+              <div style={styles.modalContent}>
+                <h2 style={styles.modalTitle}>Create New Event</h2>
+                <div style={styles.formGroup}>
+                  <input type="text" placeholder="Event Title *" value={eventFormData.title} onChange={(e) => setEventFormData({...eventFormData, title: e.target.value})} style={styles.formInput} />
+                </div>
+                <div style={styles.formGroup}>
+                  <textarea placeholder="Description *" value={eventFormData.description} onChange={(e) => setEventFormData({...eventFormData, description: e.target.value})} style={styles.formTextarea} />
+                </div>
+                <div style={styles.formRow}>
+                  <div style={styles.formGroup}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Date & Time *</label>
+                    <input type="datetime-local" value={eventFormData.date} onChange={(e) => setEventFormData({...eventFormData, date: e.target.value})} style={styles.formInput} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Venue *</label>
+                    <input type="text" placeholder="e.g., University Hall" value={eventFormData.venue} onChange={(e) => setEventFormData({...eventFormData, venue: e.target.value})} style={styles.formInput} />
+                  </div>
+                </div>
+                <div style={styles.formRow}>
+                  <select value={eventFormData.category} onChange={(e) => setEventFormData({...eventFormData, category: e.target.value})} style={styles.formInput}>
+                    {eventCategories.filter(c => c !== 'All').map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                  <input type="number" placeholder="Capacity (optional)" value={eventFormData.capacity} onChange={(e) => setEventFormData({...eventFormData, capacity: e.target.value})} style={styles.formInput} min="1" />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                  <button onClick={createEvent} style={styles.submitBtn} disabled={loading}>
+                    {loading ? '⏳ Creating...' : '✅ Create Event'}
+                  </button>
+                  <button onClick={() => setShowCreateEvent(false)} style={styles.cancelBtn}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MY CALENDAR PAGE */}
+      {currentPage === 'my-calendar' && (
+        <div style={styles.pageContent}>
+          <div style={styles.pageContainer}>
+            <h1 style={styles.pageTitle}>📅 My Event Calendar</h1>
+            
+            {message.text && (
+              <div style={message.type === 'error' ? styles.errorMessage : styles.successMessage}>
+                {message.text}
+              </div>
+            )}
+
+            {loading ? (
+              <div style={styles.emptyState}>⏳ Loading...</div>
+            ) : myEvents.length === 0 ? (
+              <div style={styles.emptyState}>
+                <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📅</div>
+                <div style={{ fontSize: '1rem' }}>No upcoming events</div>
+                <p style={{ marginTop: '0.5rem' }}>Browse events and RSVP to see them here!</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                {myEvents.map(event => {
+                  const userRSVP = checkUserRSVP(event);
+                  return (
+                    <div key={event._id} style={styles.eventCard}>
+                      <div style={styles.eventCategory}>{event.category}</div>
+                      <h3 style={styles.eventTitle}>{event.title}</h3>
+                      <div style={styles.eventDetail}>📅 {formatDate(event.date)}</div>
+                      <div style={styles.eventDetail}>🕐 {formatTime(event.date)}</div>
+                      <div style={styles.eventDetail}>📍 {event.venue}</div>
+                      <div style={styles.eventDetail}>👤 {event.organizerName}</div>
+                      <p style={{ color: '#4b5563', marginTop: '0.75rem', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                        {event.description}
+                      </p>
+                      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', color: '#15803d', borderRadius: '0.375rem', fontSize: '0.85rem', fontWeight: '600' }}>
+                          {userRSVP?.status === 'going' ? '✅ You are going' : '⭐ You are interested'}
+                        </span>
+                        <button onClick={() => cancelRSVP(event._id)} style={{ padding: '0.5rem 0.75rem', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} disabled={loading}>
+                          Cancel RSVP
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MESSAGES PAGE */}
       {currentPage === 'messages' && (
         <div style={styles.pageContent}>
           <div style={styles.pageContainer}>

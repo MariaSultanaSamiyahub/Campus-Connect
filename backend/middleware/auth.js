@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 exports.protect = async (req, res, next) => {
   try {
@@ -13,8 +14,24 @@ exports.protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     
-    // Match the payload structure from authController
-    req.user = { user_id: decoded.user_id };
+    // Find user by custom user_id field (not MongoDB _id)
+    const user = await User.findOne({ user_id: decoded.user_id }).select('-password');
+    
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Attach user with both custom user_id and MongoDB _id
+    req.user = {
+      id: user._id.toString(),  // MongoDB ObjectId for Event.organizer
+      _id: user._id,
+      user_id: user.user_id,    // Custom user ID
+      name: user.name,
+      email: user.email
+    };
     
     next();
   } catch (error) {
