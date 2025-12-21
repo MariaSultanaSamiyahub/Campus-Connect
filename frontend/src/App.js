@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Home, MessageCircle, User, LogOut, Plus, Heart, MapPin, Eye, Trash2, Edit, Calendar, CalendarDays } from 'lucide-react';
-
+import Dashboard from './Dashboard';
 const API_BASE = 'http://localhost:5000/api';
 
 const styles = {
@@ -558,6 +558,10 @@ export default function App() {
             <button onClick={() => { setCurrentPage('home'); fetchListings(); }} style={{...styles.navButton, ...(currentPage === 'home' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <Home size={20} /> Home
             </button>
+            <button onClick={() => setCurrentPage('dashboard')} 
+              style={{...styles.navButton,...(currentPage === 'dashboard' ? styles.navButtonActive : styles.navButtonInactive)}}>
+              <Home size={20} /> Dashboard
+            </button>
             <button onClick={() => { setCurrentPage('my-listings'); fetchMyListings(); }} style={{...styles.navButton, ...(currentPage === 'my-listings' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <User size={20} /> My Listings
             </button>
@@ -935,6 +939,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* DASHBOARD PAGE */}
+      {currentPage === 'dashboard' && <Dashboard />}
     </div>
   );
 }

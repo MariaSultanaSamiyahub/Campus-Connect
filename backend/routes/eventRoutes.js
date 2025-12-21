@@ -9,7 +9,7 @@ const {
   getMyEvents,
   updateEvent,
   deleteEvent
-} = require('../Controllers/eventController');
+} = require('../controllers/eventController');
 const { protect } = require('../middleware/auth'); // ← CHANGED THIS LINE
 
 // Public routes

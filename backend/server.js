@@ -2,6 +2,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const lostAndFoundRoutes = require('./routes/lostAndFoundRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -34,7 +38,10 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/events', eventRoutes); // ✨ ADD THIS LINE
-
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/lost-and-found', lostAndFoundRoutes);
 // 404 Handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
