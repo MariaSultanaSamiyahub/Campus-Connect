@@ -13,18 +13,29 @@ const {
   removeFromFavorites,
   getMyFavorites,
   
+  // Product Ratings (NEW)
+  rateProduct,
+  getProductReviews,
+  
+  // Cart (NEW)
+  addToCart,
+  getCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
+  
+  // Orders (NEW)
+  createOrder,
+  getMyOrders,
+  getOrderById,
+  cancelOrder,
+  
   // Messaging
   startConversation,
   getConversations,
   sendMessage,
   getMessages,
-  deleteConversation,
-  
-  // Transactions
-  createTransaction,
-  getTransactions,
-  getTransactionById,
-  rateTransaction
+  deleteConversation
 } = require('../controllers/marketplaceController');
 
 // ========== LISTING ROUTES ==========
@@ -40,6 +51,23 @@ router.post('/listings/:id/favorite', protect, addToFavorites);
 router.delete('/listings/:id/favorite', protect, removeFromFavorites);
 router.get('/favorites', protect, getMyFavorites);
 
+// Product Ratings (NEW)
+router.post('/listings/:id/rate', protect, rateProduct);
+router.get('/listings/:id/reviews', getProductReviews);
+
+// ========== CART ROUTES (NEW) ==========
+router.post('/cart', protect, addToCart);
+router.get('/cart', protect, getCart);
+router.put('/cart', protect, updateCartItem);
+router.delete('/cart/:listingId', protect, removeFromCart);
+router.delete('/cart', protect, clearCart);
+
+// ========== ORDER ROUTES (NEW) ==========
+router.post('/orders', protect, createOrder);
+router.get('/orders', protect, getMyOrders);
+router.get('/orders/:id', protect, getOrderById);
+router.put('/orders/:id/cancel', protect, cancelOrder);
+
 // ========== MESSAGING ROUTES ==========
 router.post('/conversations', protect, startConversation);
 router.get('/conversations', protect, getConversations);
@@ -47,11 +75,5 @@ router.delete('/conversations/:conversationId', protect, deleteConversation);
 
 router.post('/messages', protect, sendMessage);
 router.get('/messages/:conversationId', protect, getMessages);
-
-// ========== TRANSACTION ROUTES ==========
-router.post('/transactions', protect, createTransaction);
-router.get('/transactions', protect, getTransactions);
-router.get('/transactions/:id', protect, getTransactionById);
-router.post('/transactions/:id/rate', protect, rateTransaction);
 
 module.exports = router;

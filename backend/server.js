@@ -18,10 +18,8 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
-const listingRoutes = require('./routes/listingRoutes');
-const messageRoutes = require('./routes/messageRoutes');
-const transactionRoutes = require('./routes/transactionRoutes');
-const eventRoutes = require('./routes/eventRoutes'); // ✨ ADD THIS LINE
+const marketplaceRoutes = require('./routes/marketplaceRoute'); // ✅ FIXED
+const eventRoutes = require('./routes/eventRoutes');
 
 // Test Route
 app.get('/api/test', (req, res) => {
@@ -30,10 +28,8 @@ app.get('/api/test', (req, res) => {
 
 // Use Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/listings', listingRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/events', eventRoutes); // ✨ ADD THIS LINE
+app.use('/api/marketplace', marketplaceRoutes); // ✅ FIXED - This connects all marketplace routes
+app.use('/api/events', eventRoutes);
 
 // 404 Handler
 app.use((req, res) => {

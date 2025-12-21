@@ -1,18 +1,23 @@
-const { MarketplaceListing, Conversation, Message, Transaction } = require('../models/marketplace');
+const { MarketplaceListing, Cart, Order, Conversation, Message, Transaction } = require('../models/marketplace');
 const User = require('../models/User'); 
 
 // ID GENERATORS
 const generateListingId = () => `LST-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateCartId = () => `CART-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateOrderId = () => `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const generateConversationId = () => `CONV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const generateMessageId = () => `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const generateTransactionId = () => `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// DELIVERY CHARGE CONSTANT
+const DELIVERY_CHARGE = 50; // Change this value to adjust delivery charge
 
 // ========== LISTING FUNCTIONS ==========
 
 // CREATE LISTING
 exports.createListing = async (req, res) => {
   try {
-    const { title, description, category, price, condition, images, location, stock } = req.body;
+    const { title, description, category, price, condition, images, location, stock, quantity } = req.body;
     const sellerId = req.user?.user_id;
 
     if (!sellerId) {
@@ -21,6 +26,11 @@ exports.createListing = async (req, res) => {
 
     if (!title || !description || !category || !price) {
       return res.status(400).json({ success: false, message: 'Please fill all required fields' });
+    }
+
+    // MANDATORY: Check if images are provided
+    if (!images || images.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one product image is required' });
     }
 
     const seller = await User.findOne({ user_id: sellerId });
@@ -35,19 +45,20 @@ exports.createListing = async (req, res) => {
       category,
       price,
       condition: condition || 'Good',
-      images: images || [],
-      thumbnail: images?.[0] || '',
+      images, // MANDATORY
+      thumbnail: images[0],
       location: location || 'Campus',
-      stock: stock || 1, // Number of items available
+      stock: stock || 1,
+      quantity: quantity || 1,
       seller_id: sellerId,
       seller: {
         user_id: sellerId,
         name: seller.name,
-        email: seller.email,
-        rating: seller.rating
+        email: seller.email
+        // NO seller rating
       },
       status: 'active',
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     });
 
     res.status(201).json({ success: true, message: 'Listing created successfully', data: listing });
@@ -139,8 +150,13 @@ exports.updateListing = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
+    // Check if images are being updated and ensure at least one exists
+    if (req.body.images !== undefined && req.body.images.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one product image is required' });
+    }
+
     // Update allowed fields
-    const allowedUpdates = ['title', 'description', 'price', 'condition', 'images', 'location', 'status', 'stock'];
+    const allowedUpdates = ['title', 'description', 'price', 'condition', 'images', 'location', 'status', 'stock', 'quantity'];
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
         listing[field] = req.body[field];
@@ -151,8 +167,8 @@ exports.updateListing = async (req, res) => {
       listing.thumbnail = req.body.images[0] || listing.thumbnail;
     }
 
-    // Auto mark as sold if stock = 0
-    if (req.body.stock === 0) {
+    // Auto mark as sold if stock/quantity = 0
+    if (req.body.stock === 0 || req.body.quantity === 0) {
       listing.status = 'sold';
     } else if (req.body.status === 'active' && listing.stock > 0) {
       listing.status = 'active';
@@ -234,12 +250,13 @@ exports.addToFavorites = async (req, res) => {
     }
 
     listing.favorites.push({ user_id: userId, saved_at: new Date() });
-    await listing.save();
+    listing.markModified('favorites');
+    await listing.save({ validateBeforeSave: false });
 
     res.json({ success: true, message: 'Added to favorites', data: listing });
   } catch (error) {
     console.error('Add to favorites error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -259,12 +276,13 @@ exports.removeFromFavorites = async (req, res) => {
     }
 
     listing.favorites = listing.favorites.filter(fav => fav.user_id !== userId);
-    await listing.save();
+    listing.markModified('favorites');
+    await listing.save({ validateBeforeSave: false });
 
     res.json({ success: true, message: 'Removed from favorites', data: listing });
   } catch (error) {
     console.error('Remove from favorites error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -284,6 +302,456 @@ exports.getMyFavorites = async (req, res) => {
     res.json({ success: true, data: listings, count: listings.length });
   } catch (error) {
     console.error('Get favorites error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ========== PRODUCT RATING FUNCTIONS (UPDATED) ==========
+
+// RATE PRODUCT (After purchase) - FIXED TO CHECK PURCHASE
+// RATE PRODUCT (After purchase) - FIXED TO CHECK PURCHASE
+exports.rateProduct = async (req, res) => {
+  try {
+    const { rating, review } = req.body;
+    const userId = req.user?.user_id;
+    const listingId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be between 1-5' });
+    }
+
+    const listing = await MarketplaceListing.findOne({ listing_id: listingId });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: 'Listing not found' });
+    }
+
+    // CRITICAL: Prevent seller from rating their own product
+    if (listing.seller_id === userId) {
+      return res.status(403).json({ success: false, message: 'You cannot rate your own product' });
+    }
+
+    // CRITICAL: Check if user has purchased this product
+    const hasPurchased = await Order.findOne({
+      user_id: userId,
+      'items.listing_id': listingId,
+      status: { $in: ['completed', 'delivered', 'confirmed', 'processing', 'shipped'] }
+    });
+
+    if (!hasPurchased) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You can only rate products you have purchased' 
+      });
+    }
+
+    // Check if user already rated this product
+    const existingReview = listing.reviews.find(r => r.user_id === userId);
+    if (existingReview) {
+      return res.status(400).json({ success: false, message: 'You have already rated this product' });
+    }
+
+    const user = await User.findOne({ user_id: userId });
+
+    // Add review
+    listing.reviews.push({
+      user_id: userId,
+      user_name: user?.name || 'Anonymous',
+      rating: rating,
+      review: review || '',
+      created_at: new Date()
+    });
+
+    // Calculate new average rating
+    listing.calculateRating(rating);
+
+    await listing.save();
+
+    res.json({ success: true, message: 'Product rated successfully', data: listing });
+  } catch (error) {
+    console.error('Rate product error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// GET PRODUCT REVIEWS
+exports.getProductReviews = async (req, res) => {
+  try {
+    const listingId = req.params.id;
+
+    const listing = await MarketplaceListing.findOne({ listing_id: listingId });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: 'Listing not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      data: {
+        rating: listing.rating,
+        total_ratings: listing.total_ratings,
+        reviews: listing.reviews
+      }
+    });
+  } catch (error) {
+    console.error('Get reviews error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ========== CART FUNCTIONS (NEW) ==========
+
+// ADD TO CART
+exports.addToCart = async (req, res) => {
+  try {
+    const { listingId, quantity = 1 } = req.body;
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const listing = await MarketplaceListing.findOne({ listing_id: listingId, status: 'active' });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: 'Product not found or unavailable' });
+    }
+
+    if (listing.quantity < quantity) {
+      return res.status(400).json({ success: false, message: 'Insufficient stock' });
+    }
+
+    let cart = await Cart.findOne({ user_id: userId });
+
+    if (!cart) {
+      cart = await Cart.create({
+        cart_id: generateCartId(),
+        user_id: userId,
+        items: []
+      });
+    }
+
+    const existingItem = cart.items.find(item => item.listing_id === listingId);
+
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      cart.items.push({
+        listing_id: listingId,
+        title: listing.title,
+        price: listing.price,
+        quantity: quantity,
+        images: listing.images,
+        seller_id: listing.seller_id,
+        seller_name: listing.seller.name,
+        added_at: new Date()
+      });
+    }
+
+    cart.calculateTotal();
+    await cart.save();
+
+    res.json({ success: true, message: 'Added to cart', data: cart });
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// GET CART
+exports.getCart = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    let cart = await Cart.findOne({ user_id: userId });
+
+    if (!cart) {
+      cart = await Cart.create({
+        cart_id: generateCartId(),
+        user_id: userId,
+        items: []
+      });
+    }
+
+    res.json({ success: true, data: cart });
+  } catch (error) {
+    console.error('Get cart error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// UPDATE CART ITEM QUANTITY
+exports.updateCartItem = async (req, res) => {
+  try {
+    const { listingId, quantity } = req.body;
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (quantity < 1) {
+      return res.status(400).json({ success: false, message: 'Quantity must be at least 1' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    const item = cart.items.find(item => item.listing_id === listingId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not in cart' });
+    }
+
+    const listing = await MarketplaceListing.findOne({ listing_id: listingId });
+    if (listing && listing.quantity < quantity) {
+      return res.status(400).json({ success: false, message: 'Insufficient stock' });
+    }
+
+    item.quantity = quantity;
+    cart.calculateTotal();
+    await cart.save();
+
+    res.json({ success: true, message: 'Cart updated', data: cart });
+  } catch (error) {
+    console.error('Update cart error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// REMOVE FROM CART
+exports.removeFromCart = async (req, res) => {
+  try {
+    const { listingId } = req.params;
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    cart.items = cart.items.filter(item => item.listing_id !== listingId);
+    cart.calculateTotal();
+    await cart.save();
+
+    res.json({ success: true, message: 'Item removed from cart', data: cart });
+  } catch (error) {
+    console.error('Remove from cart error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// CLEAR CART
+exports.clearCart = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+
+    cart.items = [];
+    cart.total_amount = 0;
+    await cart.save();
+
+    res.json({ success: true, message: 'Cart cleared', data: cart });
+  } catch (error) {
+    console.error('Clear cart error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ========== ORDER FUNCTIONS (NEW) ==========
+
+// CREATE ORDER (Checkout)
+exports.createOrder = async (req, res) => {
+  try {
+    const { deliveryOption, deliveryAddress, phoneNumber, paymentMethod, notes } = req.body;
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!deliveryOption || !['campus', 'home'].includes(deliveryOption)) {
+      return res.status(400).json({ success: false, message: 'Invalid delivery option. Choose "campus" or "home"' });
+    }
+
+    if (deliveryOption === 'home' && !deliveryAddress) {
+      return res.status(400).json({ success: false, message: 'Delivery address required for home delivery' });
+    }
+
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Cart is empty' });
+    }
+
+    // Verify stock availability and reduce quantities
+    for (const item of cart.items) {
+      const listing = await MarketplaceListing.findOne({ listing_id: item.listing_id });
+      
+      if (!listing || listing.status !== 'active') {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Product "${item.title}" is no longer available` 
+        });
+      }
+
+      if (listing.quantity < item.quantity) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Insufficient stock for "${item.title}". Only ${listing.quantity} available` 
+        });
+      }
+
+      // REDUCE PRODUCT QUANTITY
+      listing.quantity -= item.quantity;
+      
+      // Auto mark as sold if quantity reaches 0
+      if (listing.quantity === 0) {
+        listing.status = 'sold';
+      }
+
+await listing.save({ validateBeforeSave: false });
+    }
+
+    const user = await User.findOne({ user_id: userId });
+    const subtotal = cart.total_amount;
+    const deliveryCharge = deliveryOption === 'home' ? DELIVERY_CHARGE : 0;
+    const totalAmount = subtotal + deliveryCharge;
+
+    const order = await Order.create({
+      order_id: generateOrderId(),
+      user_id: userId,
+      buyer: {
+        user_id: userId,
+        name: user?.name || 'User',
+        email: user?.email || 'user@example.com'
+      },
+      items: cart.items,
+      subtotal: subtotal,
+      delivery_charge: deliveryCharge,
+      total_amount: totalAmount,
+      delivery_option: deliveryOption,
+      delivery_address: deliveryAddress || 'Campus Pickup',
+      phone_number: phoneNumber || user?.phone || '',
+      payment_method: paymentMethod || 'cash',
+      payment_status: 'pending',
+      status: 'pending',
+      notes: notes || ''
+    });
+
+    // Clear cart after successful order
+    cart.items = [];
+    cart.total_amount = 0;
+    await cart.save();
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Order placed successfully', 
+      data: order 
+    });
+  } catch (error) {
+    console.error('Create order error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// GET MY ORDERS
+exports.getMyOrders = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const orders = await Order.find({ user_id: userId }).sort({ created_at: -1 });
+
+    res.json({ success: true, data: orders, count: orders.length });
+  } catch (error) {
+    console.error('Get orders error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// GET ORDER BY ID
+exports.getOrderById = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+    const orderId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const order = await Order.findOne({ order_id: orderId, user_id: userId });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    console.error('Get order error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// CANCEL ORDER
+exports.cancelOrder = async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+    const orderId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const order = await Order.findOne({ order_id: orderId, user_id: userId });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Only pending orders can be cancelled' });
+    }
+
+    // Restore product quantities
+    for (const item of order.items) {
+      const listing = await MarketplaceListing.findOne({ listing_id: item.listing_id });
+      if (listing) {
+        listing.quantity += item.quantity;
+        if (listing.status === 'sold') {
+          listing.status = 'active';
+        }
+        await listing.save();
+      }
+    }
+
+    order.status = 'cancelled';
+    order.cancelled_at = new Date();
+    await order.save();
+
+    res.json({ success: true, message: 'Order cancelled', data: order });
+  } catch (error) {
+    console.error('Cancel order error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -489,200 +957,4 @@ exports.deleteConversation = async (req, res) => {
     console.error('Delete conversation error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-};
-
-// ========== TRANSACTION & RATING FUNCTIONS ==========
-
-// CREATE TRANSACTION (Mark as sold)
-exports.createTransaction = async (req, res) => {
-  try {
-    const { listingId, buyerId } = req.body;
-    const sellerId = req.user?.user_id;
-
-    if (!sellerId) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    if (!listingId || !buyerId) {
-      return res.status(400).json({ success: false, message: 'Listing ID and buyer ID required' });
-    }
-
-    const listing = await MarketplaceListing.findOne({ listing_id: listingId, seller_id: sellerId });
-    if (!listing) {
-      return res.status(404).json({ success: false, message: 'Listing not found' });
-    }
-
-    if (listing.status === 'sold') {
-      return res.status(400).json({ success: false, message: 'Item already sold' });
-    }
-
-    const seller = await User.findOne({ user_id: sellerId });
-    const buyer = await User.findOne({ user_id: buyerId });
-
-    if (!buyer) {
-      return res.status(404).json({ success: false, message: 'Buyer not found' });
-    }
-
-    const transaction = await Transaction.create({
-      transaction_id: generateTransactionId(),
-      listing_id: listingId,
-      seller_id: sellerId,
-      buyer_id: buyerId,
-      seller: { user_id: sellerId, name: seller?.name || 'Seller', email: seller?.email || 'seller@example.com' },
-      buyer: { user_id: buyerId, name: buyer.name, email: buyer.email },
-      status: 'completed'
-    });
-
-    listing.status = 'sold';
-    await listing.save();
-
-    res.status(201).json({ success: true, message: 'Transaction created', data: transaction });
-  } catch (error) {
-    console.error('Create transaction error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-// GET TRANSACTIONS
-exports.getTransactions = async (req, res) => {
-  try {
-    const userId = req.user?.user_id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    const { type = 'all' } = req.query;
-
-    let filter = {};
-    if (type === 'buyer') {
-      filter.buyer_id = userId;
-    } else if (type === 'seller') {
-      filter.seller_id = userId;
-    } else {
-      filter.$or = [{ buyer_id: userId }, { seller_id: userId }];
-    }
-
-    const transactions = await Transaction.find(filter).sort({ created_at: -1 });
-
-    res.json({ success: true, data: transactions, count: transactions.length });
-  } catch (error) {
-    console.error('Get transactions error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-// GET TRANSACTION BY ID
-exports.getTransactionById = async (req, res) => {
-  try {
-    const userId = req.user?.user_id;
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    const transaction = await Transaction.findOne({
-      transaction_id: req.params.id,
-      $or: [{ buyer_id: userId }, { seller_id: userId }]
-    });
-
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: 'Transaction not found' });
-    }
-
-    res.json({ success: true, data: transaction });
-  } catch (error) {
-    console.error('Get transaction error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-// RATE & REVIEW
-exports.rateTransaction = async (req, res) => {
-  try {
-    const { rating, review } = req.body;
-    const userId = req.user?.user_id;
-
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ success: false, message: 'Rating must be 1-5' });
-    }
-
-    const transaction = await Transaction.findOne({ transaction_id: req.params.id });
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: 'Transaction not found' });
-    }
-
-    const isBuyer = transaction.buyer_id === userId;
-    const isSeller = transaction.seller_id === userId;
-
-    if (!isBuyer && !isSeller) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
-    }
-
-    if (isBuyer) {
-      if (transaction.buyer_rating) {
-        return res.status(400).json({ success: false, message: 'Already rated' });
-      }
-      transaction.buyer_rating = rating;
-      transaction.buyer_review = review || '';
-
-      const seller = await User.findOne({ user_id: transaction.seller_id });
-      if (seller) {
-        seller.calculateRating(rating);
-        await seller.save();
-      }
-    } else if (isSeller) {
-      if (transaction.seller_rating) {
-        return res.status(400).json({ success: false, message: 'Already rated' });
-      }
-      transaction.seller_rating = rating;
-      transaction.seller_review = review || '';
-
-      const buyer = await User.findOne({ user_id: transaction.buyer_id });
-      if (buyer) {
-        buyer.calculateRating(rating);
-        await buyer.save();
-      }
-    }
-
-    if (transaction.buyer_rating && transaction.seller_rating) {
-      transaction.status = 'completed';
-      transaction.completed_at = new Date();
-    }
-
-    await transaction.save();
-
-    res.json({ success: true, message: 'Rating submitted', data: transaction });
-  } catch (error) {
-    console.error('Rate transaction error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-module.exports = {
-  // Listings
-  createListing,
-  getAllListings,
-  getListingById,
-  updateListing,
-  deleteListing,
-  getMyListings,
-  addToFavorites,
-  removeFromFavorites,
-  getMyFavorites,
-  
-  // Messaging
-  startConversation,
-  getConversations,
-  sendMessage,
-  getMessages,
-  deleteConversation,
-  
-  // Transactions
-  createTransaction,
-  getTransactions,
-  getTransactionById,
-  rateTransaction
 };

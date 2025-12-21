@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Home, LogOut, Megaphone, ShoppingBag, AlertCircle, Calendar, MessageCircle, Plus } from 'lucide-react';
+import { Home, LogOut, Megaphone, ShoppingBag,ShoppingCart , AlertCircle, Calendar, MessageCircle, Plus, Heart, Package } from 'lucide-react';
+import Marketplace from './components/Marketplace/Marketplace';
+import MessagesPage from './components/Marketplace/Messages';
+import FavoritesPage from './components/Marketplace/Favorites';
+import MyListingsPage from './components/Marketplace/MyListings';
+import Cart from './components/Marketplace/Cart';
+import Orders from './components/Marketplace/Orders';
+
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -59,63 +66,64 @@ export default function App() {
   const [registerPassword, setRegisterPassword] = useState('');
 
   // Marketplace
-  const [listings, setListings] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState({ title: '', description: '', category: 'Electronics', price: '', condition: 'Good', location: 'Campus' });
+  // //const [listings, setListings] = useState([]);
+  // const [searchQuery, setSearchQuery] = useState('');
+  // const [category, setCategory] = useState('');
+  // const [showCreateForm, setShowCreateForm] = useState(false);
+  // const [formData, setFormData] = useState({ title: '', description: '', category: 'Electronics', price: '', condition: 'Good', location: 'Campus' });//
 
   // Events
   const [events, setEvents] = useState([]);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [eventFormData, setEventFormData] = useState({ title: '', description: '', date: '', venue: '', category: 'Other', capacity: '' });
 
-  const categories = ['Books', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Sports', 'Other'];
-  const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
+  // const categories = ['Books', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Sports', 'Other'];
+  // const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 4000);
   };
 
-  const fetchListings = async () => {
-    setLoading(true);
-    try {
-      let url = `${API_BASE}/marketplace/listings?limit=12`;
-      if (category) url += `&category=${category}`;
-      if (searchQuery) url += `&search=${searchQuery}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      setListings(data.data || []);
-    } catch (error) {
-      showMessage('error', '❌ Cannot connect to backend');
-    }
-    setLoading(false);
-  };
 
-  const createListing = async () => {
-    if (!formData.title || !formData.description || !formData.price) {
-      showMessage('error', '⚠️ Please fill all required fields');
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE}/marketplace/listings`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(formData)
-      });
-      if (response.ok) {
-        showMessage('success', '✅ Listing created!');
-        setShowCreateForm(false);
-        setFormData({ title: '', description: '', category: 'Electronics', price: '', condition: 'Good', location: 'Campus' });
-        fetchListings();
-      } else {
-        showMessage('error', '❌ Error creating listing');
-      }
-    } catch (error) {
-      showMessage('error', '❌ Error creating listing');
-    }
-  };
+  // const fetchListings = async () => {
+  //   setLoading(true);
+  //   try {
+  //     let url = `${API_BASE}/marketplace/listings?limit=12`;
+  //     if (category) url += `&category=${category}`;
+  //     if (searchQuery) url += `&search=${searchQuery}`;
+  //     const response = await fetch(url);
+  //     const data = await response.json();
+  //     setListings(data.data || []);
+  //   } catch (error) {
+  //     showMessage('error', '❌ Cannot connect to backend');
+  //   }
+  //   setLoading(false);
+  // };
+
+  // const createListing = async () => {
+  //   if (!formData.title || !formData.description || !formData.price) {
+  //     showMessage('error', '⚠️ Please fill all required fields');
+  //     return;
+  //   }
+  //   try {
+  //     const response = await fetch(`${API_BASE}/marketplace/listings`, {
+  //       method: 'POST',
+  //       headers: getAuthHeaders(),
+  //       body: JSON.stringify(formData)
+  //     });
+  //     if (response.ok) {
+  //       showMessage('success', '✅ Listing created!');
+  //       setShowCreateForm(false);
+  //       setFormData({ title: '', description: '', category: 'Electronics', price: '', condition: 'Good', location: 'Campus' });
+  //       fetchListings();
+  //     } else {
+  //       showMessage('error', '❌ Error creating listing');
+  //     }
+  //   } catch (error) {
+  //     showMessage('error', '❌ Error creating listing');
+  //   }
+  // };
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -197,7 +205,7 @@ export default function App() {
       showMessage('error', '❌ Registration failed');
     }
   };
-
+  
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       showMessage('error', '⚠️ Please fill all fields');
@@ -232,9 +240,9 @@ export default function App() {
     showMessage('success', '✅ Logged out');
   };
 
-  useEffect(() => {
-    if (isLoggedIn && currentPage === 'marketplace') fetchListings();
-  }, [currentPage, category, searchQuery, isLoggedIn]);
+  // useEffect(() => {
+  //   if (isLoggedIn && currentPage === 'marketplace') fetchListings();
+  // }, [currentPage, category, searchQuery, isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn && currentPage === 'events') fetchEvents();
@@ -289,6 +297,10 @@ export default function App() {
           <button onClick={() => setCurrentPage('lost-found')} style={{...styles.sidebarItem, ...(currentPage === 'lost-found' ? styles.sidebarItemActive : {})}}><AlertCircle size={20} /> Lost & Found</button>
           <button onClick={() => setCurrentPage('events')} style={{...styles.sidebarItem, ...(currentPage === 'events' ? styles.sidebarItemActive : {})}}><Calendar size={20} /> Events</button>
           <button onClick={() => setCurrentPage('messages')} style={{...styles.sidebarItem, ...(currentPage === 'messages' ? styles.sidebarItemActive : {})}}><MessageCircle size={20} /> Messages</button>
+          <button onClick={() => setCurrentPage('favorites')} style={{...styles.sidebarItem, ...(currentPage === 'favorites' ? styles.sidebarItemActive : {})}}><Heart size={20} /> My Favorites</button>
+          <button onClick={() => setCurrentPage('mylistings')} style={{...styles.sidebarItem, ...(currentPage === 'mylistings' ? styles.sidebarItemActive : {})}}><Package size={20} /> My Listings</button>
+          <button onClick={() => setCurrentPage('cart')} style={{...styles.sidebarItem, ...(currentPage === 'cart' ? styles.sidebarItemActive : {})}}><ShoppingCart size={20} /> Cart</button>
+          <button onClick={() => setCurrentPage('orders')} style={{...styles.sidebarItem, ...(currentPage === 'orders' ? styles.sidebarItemActive : {})}}><Package size={20} /> Orders</button>
         </div>
       </div>
 
@@ -330,8 +342,7 @@ export default function App() {
               </div>
             </div>
           )}
-
-          {currentPage === 'marketplace' && (
+        {/* {currentPage === 'marketplace' && (
             <div style={styles.pageContainer}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 style={styles.pageTitle}>🛒 Marketplace</h1>
@@ -382,7 +393,13 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
+          )} */} 
+          {currentPage === 'marketplace' && <Marketplace />}
+          {currentPage === 'cart' && <Cart />}
+          {currentPage === 'orders' && <Orders />}
+          {currentPage === 'messages' && <MessagesPage />}
+          {currentPage === 'favorites' && <FavoritesPage />}
+          {currentPage === 'mylistings' && <MyListingsPage />}
 
           {currentPage === 'events' && (
             <div style={styles.pageContainer}>
@@ -428,7 +445,7 @@ export default function App() {
             </div>
           )}
 
-          {['announcements', 'lost-found', 'messages', 'admin'].includes(currentPage) && (
+          {['announcements', 'lost-found', 'admin'].includes(currentPage) && (
             <div style={styles.pageContainer}>
               <h1 style={styles.pageTitle}>{currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}</h1>
               <div style={styles.emptyState}>
