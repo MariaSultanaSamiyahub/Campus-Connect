@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Home, MessageCircle, User, LogOut, Plus, Heart, MapPin, Eye, Trash2, Edit, Calendar, CalendarDays } from 'lucide-react';
+import { Search, Home, MessageCircle, User, LogOut, Plus, Heart, MapPin, Eye, Trash2, Edit, Calendar, CalendarDays, Package} from 'lucide-react';
 import Dashboard from './Dashboard';
+import LostAndFound from './LostAndFound';
 const API_BASE = 'http://localhost:5000/api';
 
 const styles = {
@@ -565,6 +566,9 @@ export default function App() {
             <button onClick={() => { setCurrentPage('my-listings'); fetchMyListings(); }} style={{...styles.navButton, ...(currentPage === 'my-listings' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <User size={20} /> My Listings
             </button>
+            <button onClick={() => { setCurrentPage('lost-and-found'); }} style={{...styles.navButton, ...(currentPage === 'lost-and-found' ? styles.navButtonActive : styles.navButtonInactive)}}>
+              <Package size={20} /> Lost & Found
+            </button>
             <button onClick={() => { setCurrentPage('events'); fetchEvents(); }} style={{...styles.navButton, ...(currentPage === 'events' ? styles.navButtonActive : styles.navButtonInactive)}}>
               <Calendar size={20} /> Events
             </button>
@@ -941,6 +945,8 @@ export default function App() {
       )}
       {/* DASHBOARD PAGE */}
       {currentPage === 'dashboard' && <Dashboard />}
+      {/* LOST & FOUND PAGE */}
+      {currentPage === 'lost-and-found' && <LostAndFound />}
     </div>
   );
 }
