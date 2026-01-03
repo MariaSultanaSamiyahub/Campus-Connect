@@ -161,6 +161,7 @@ exports.getMe = async (req, res) => {
     res.json({
       success: true,
       user: {
+        _id: user._id,  // ✅ LOST & FOUND - Include MongoDB _id for ownership checks
         user_id: user.user_id,
         name: user.name,
         email: user.email,

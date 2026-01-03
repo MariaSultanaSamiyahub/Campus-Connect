@@ -7,9 +7,11 @@ const LostAndFound = require('../models/LostAndFound');
 const Event = require('../models/Event');
 const FlaggedContent = require('../models/FlaggedContent');
 
+// ✅ DASHBOARD - Get user statistics (finalized implementation)
 router.get('/stats', protect, async (req, res) => {
   try {
-    const userId = req.user.user_id; 
+    const userId = req.user._id; // Use MongoDB _id for queries
+    const userCustomId = req.user.user_id; // Custom user_id for Notification model
 
     const [
       unreadCount, 
@@ -19,7 +21,7 @@ router.get('/stats', protect, async (req, res) => {
       upcomingEvents, 
       pendingFlags
     ] = await Promise.all([
-      Notification.countDocuments({ user_id: userId, is_read: false }),
+      Notification.countDocuments({ user_id: userCustomId, is_read: false }),
 
       Marketplace.countDocuments({ seller_id: userId, status: 'available' }),
 
@@ -27,7 +29,7 @@ router.get('/stats', protect, async (req, res) => {
 
       LostAndFound.countDocuments({ posted_by: userId, type: 'found', status: 'active' }),
 
-      Event.countDocuments({ organizer_id: userId, status: 'upcoming' }),
+      Event.countDocuments({ organizer: userId, status: 'upcoming' }),
 
       FlaggedContent.countDocuments({ status: 'pending' })
     ]);
@@ -61,19 +63,81 @@ router.get('/stats', protect, async (req, res) => {
   }
 });
 
+// ✅ DASHBOARD - Get recent activity (finalized implementation)
 router.get('/recent-activity', protect, async (req, res) => {
   try {
-    const userId = req.user.user_id;
+    const userId = req.user._id; // Use MongoDB _id
+    const userCustomId = req.user.user_id; // Custom user_id
 
+    // Fetch recent activities from various sources
+    const [recentListings, recentLostFound, recentEvents, recentNotifications] = await Promise.all([
+      Marketplace.find({ seller_id: userId })
+        .sort({ created_at: -1 })
+        .limit(3)
+        .select('title created_at')
+        .lean(),
+      
+      LostAndFound.find({ posted_by: userId })
+        .sort({ created_at: -1 })
+        .limit(3)
+        .select('title type created_at')
+        .lean(),
+      
+      Event.find({ organizer: userId })
+        .sort({ created_at: -1 })
+        .limit(3)
+        .select('title date created_at')
+        .lean(),
+      
+      Notification.find({ user_id: userCustomId })
+        .sort({ created_at: -1 })
+        .limit(3)
+        .select('title message created_at type')
+        .lean()
+    ]);
 
-    const recentActivity = [
-      {
+    // Combine and format activities
+    const activities = [
+      ...recentListings.map(item => ({
+        title: `New Listing: ${item.title}`,
+        description: 'You posted a new marketplace listing',
+        timestamp: item.created_at,
+        type: 'marketplace'
+      })),
+      ...recentLostFound.map(item => ({
+        title: `${item.type === 'lost' ? 'Lost' : 'Found'}: ${item.title}`,
+        description: `You posted a ${item.type} item`,
+        timestamp: item.created_at,
+        type: 'lostfound'
+      })),
+      ...recentEvents.map(item => ({
+        title: `Event Created: ${item.title}`,
+        description: `Event scheduled for ${new Date(item.date).toLocaleDateString()}`,
+        timestamp: item.created_at,
+        type: 'event'
+      })),
+      ...recentNotifications.map(item => ({
+        title: item.title || 'New Notification',
+        description: item.message,
+        timestamp: item.created_at,
+        type: item.type || 'notification'
+      }))
+    ];
+
+    // Sort by timestamp and limit to 10 most recent
+    const recentActivity = activities
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 10);
+
+    // If no activity, show welcome message
+    if (recentActivity.length === 0) {
+      recentActivity.push({
         title: 'Welcome to Campus Connect',
-        description: 'Your dashboard is ready.',
+        description: 'Your dashboard is ready. Start by posting items, creating events, or browsing the marketplace.',
         timestamp: new Date(),
         type: 'system'
-      }
-    ];
+      });
+    }
 
     res.json({ success: true, data: recentActivity });
   } catch (error) {

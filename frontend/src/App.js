@@ -18,7 +18,12 @@ import EventCard from './components/Events/EventCard';
 import CreateEvent from './components/Events/CreateEvent';
 import MyEvents from './components/Events/MyEvents';
 
+// ✅ LOST & FOUND IMPORTS - Finalized implementation
 import LostAndFound from './LostAndFound';
+import MyLostAndFound from './components/LostAndFound/MyLostAndFound';
+
+// ✅ ADMIN & DASHBOARD IMPORTS - Finalized implementation
+import AdminDashboard from './components/Admin/AdminDashboard';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -201,14 +206,13 @@ export default function App() {
     showMessage('success', '✅ Logged out');
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  };
+  // formatDate function removed - not currently used
 
   // --- EFFECTS ---
 
   useEffect(() => {
     if (isLoggedIn && currentPage === 'events') fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, isLoggedIn]);
 
   useEffect(() => {
@@ -223,7 +227,8 @@ export default function App() {
           .catch(console.error);
       }
     }
-  }, [currentPage, isLoggedIn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, isLoggedIn, user]);
 
   // LOGIN SCREEN
   if (!isLoggedIn && authPage === 'login') {
@@ -272,7 +277,10 @@ export default function App() {
           <button onClick={() => setCurrentPage('dashboard')} style={{...styles.sidebarItem, ...(currentPage === 'dashboard' ? styles.sidebarItemActive : {})}}><Home size={20} /> Dashboard</button>
           <button onClick={() => setCurrentPage('announcements')} style={{...styles.sidebarItem, ...(currentPage === 'announcements' ? styles.sidebarItemActive : {})}}><Megaphone size={20} /> Announcements</button>
           <button onClick={() => setCurrentPage('marketplace')} style={{...styles.sidebarItem, ...(currentPage === 'marketplace' ? styles.sidebarItemActive : {})}}><ShoppingBag size={20} /> Marketplace</button>
+          {/* ✅ LOST & FOUND - Main Lost & Found page (browse all items) */}
           <button onClick={() => setCurrentPage('lost-found')} style={{...styles.sidebarItem, ...(currentPage === 'lost-found' ? styles.sidebarItemActive : {})}}><AlertCircle size={20} /> Lost & Found</button>
+          {/* ✅ LOST & FOUND - My Lost & Found page (manage user's own items) */}
+          <button onClick={() => setCurrentPage('my-lost-found')} style={{...styles.sidebarItem, ...(currentPage === 'my-lost-found' ? styles.sidebarItemActive : {})}}><Package size={20} /> My Lost & Found</button>
           <button onClick={() => setCurrentPage('events')} style={{...styles.sidebarItem, ...(currentPage === 'events' ? styles.sidebarItemActive : {})}}><Calendar size={20} /> Events</button>
          
           {/* ✅ NEW - My Events Button (Added right after Events) */}
@@ -467,86 +475,14 @@ export default function App() {
           {/* ✅ NEW - My Events Page */}
           {currentPage === 'my-events' && <MyEvents />}
 
-          {/* ADMIN DASHBOARD */}
-          {currentPage === 'admin' && (
-            <div style={styles.pageContainer}>
-               <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem'}}>
-                 <h1 style={{...styles.pageTitle, marginBottom: 0}}>🛡️ Admin Dashboard</h1>
-                 {adminView !== 'main' && (
-                   <button onClick={() => setAdminView('main')} style={{...styles.headerBtn, width: 'auto', backgroundColor: '#6b7280'}}>
-                     ⬅ Back to Dashboard
-                   </button>
-                 )}
-               </div>
+          {/* ✅ ADMIN & DASHBOARD - Admin Dashboard (finalized implementation) */}
+          {currentPage === 'admin' && <AdminDashboard />}
 
-               {/* MAIN VIEW */}
-               {adminView === 'main' && (
-                 <div style={styles.featureGrid}>
-                   <div style={styles.featureCard} onClick={fetchUsers}>
-                     <h3 style={styles.featureTitle}>👥 Manage Users</h3>
-                     <p>View all registered students</p>
-                   </div>
-                   <div style={styles.featureCard} onClick={() => setAdminView('moderation')}>
-                     <h3 style={styles.featureTitle}>⚠️ Moderation</h3>
-                     <p>Review reported content</p>
-                   </div>
-                   <div style={styles.featureCard}>
-                     <h3 style={styles.featureTitle}>🟢 System Status</h3>
-                     <p style={{color: 'green', fontWeight: 'bold'}}>Online</p>
-                   </div>
-                 </div>
-               )}
-
-               {/* MANAGE USERS VIEW */}
-               {adminView === 'users' && (
-                 <div style={styles.eventCard}>
-                    <h2>User List</h2>
-                    {loading ? <p>Loading...</p> : (
-                      <table style={{width: '100%', textAlign: 'left', borderCollapse: 'collapse'}}>
-                        <thead>
-                          <tr style={{borderBottom: '2px solid #e5e7eb'}}>
-                            <th style={{padding: '1rem'}}>Name</th>
-                            <th style={{padding: '1rem'}}>Email</th>
-                            <th style={{padding: '1rem'}}>Role</th>
-                            <th style={{padding: '1rem'}}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users.map(user => (
-                            <tr key={user._id || user.user_id} style={{borderBottom: '1px solid #e5e7eb'}}>
-                              <td style={{padding: '1rem'}}>{user.name}</td>
-                              <td style={{padding: '1rem'}}>{user.email}</td>
-                              <td style={{padding: '1rem'}}>
-                                <span style={{
-                                  backgroundColor: user.role === 'admin' ? '#ede9fe' : '#dbeafe',
-                                  color: user.role === 'admin' ? '#7c3aed' : '#1e40af',
-                                  padding: '0.25rem 0.75rem', borderRadius: '1rem', fontSize: '0.85rem'
-                                }}>
-                                  {user.role}
-                                </span>
-                              </td>
-                              <td style={{padding: '1rem'}}>
-                                <button style={{...styles.headerBtn, backgroundColor: '#ef4444', width: 'auto', padding: '0.25rem 0.75rem', fontSize: '0.85rem'}}>Ban</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                 </div>
-               )}
-
-               {/* MODERATION VIEW */}
-               {adminView === 'moderation' && (
-                 <div style={styles.emptyState}>
-                   <h3>No reports found</h3>
-                   <p>Good job! The community is safe.</p>
-                 </div>
-               )}
-            </div>
-          )}
-
+          {/* ✅ LOST & FOUND - Main Lost & Found page route (browse/search all items) */}
           {currentPage === 'lost-found' && <LostAndFound />}
+          
+          {/* ✅ LOST & FOUND - My Lost & Found page route (user's own items management) */}
+          {currentPage === 'my-lost-found' && <MyLostAndFound />}
 
         </div>
       </div>

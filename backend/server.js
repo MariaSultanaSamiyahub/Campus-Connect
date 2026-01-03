@@ -4,6 +4,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const app = express();
+
+// ✅ LOST & FOUND - Import Lost & Found routes (finalized implementation)
 const lostAndFoundRoutes = require('./routes/lostAndFoundRoutes');
 
 // Middleware
@@ -20,6 +22,11 @@ mongoose.connect(process.env.MONGODB_URI)
 const authRoutes = require('./routes/authRoutes');
 const marketplaceRoutes = require('./routes/marketplaceRoute'); // ✅ FIXED
 const eventRoutes = require('./routes/eventRoutes');
+// ✅ ADMIN & DASHBOARD - Import admin and dashboard routes (finalized implementation)
+const adminRoutes = require('./routes/adminRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
 
 // Test Route
 app.get('/api/test', (req, res) => {
@@ -30,7 +37,18 @@ app.get('/api/test', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/marketplace', marketplaceRoutes); // ✅ FIXED - This connects all marketplace routes
 app.use('/api/events', eventRoutes);
+// ✅ LOST & FOUND - Register Lost & Found routes at /api/lost-and-found endpoint
+// This enables all Lost & Found functionality: GET all items, GET single item, GET my items,
+// POST create item, PUT update item, DELETE item, POST claim item
 app.use('/api/lost-and-found', lostAndFoundRoutes);
+// ✅ ADMIN & DASHBOARD - Register admin and dashboard routes
+// Admin routes: GET flagged content, PUT update flags, DELETE content
+// Dashboard routes: GET stats, GET recent activity
+app.use('/api/admin', adminRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+// ✅ NOTIFICATIONS & ANNOUNCEMENTS - Register notification and announcement routes
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // 404 Handler
 app.use((req, res) => {
