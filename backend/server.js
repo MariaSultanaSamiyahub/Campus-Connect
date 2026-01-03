@@ -3,8 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-
 const app = express();
+const lostAndFoundRoutes = require('./routes/lostAndFoundRoutes');
 
 // Middleware
 app.use(cors());
@@ -30,6 +30,7 @@ app.get('/api/test', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/marketplace', marketplaceRoutes); // ✅ FIXED - This connects all marketplace routes
 app.use('/api/events', eventRoutes);
+app.use('/api/lost-and-found', lostAndFoundRoutes);
 
 // 404 Handler
 app.use((req, res) => {

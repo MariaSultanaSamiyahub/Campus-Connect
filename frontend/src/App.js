@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Home, LogOut, Megaphone, ShoppingBag, ShoppingCart, AlertCircle, Calendar, MessageCircle, Plus, Heart, Package, Bell } from 'lucide-react';
 
-// YOUR IMPORTS
 import Marketplace from './components/Marketplace/Marketplace';
 import MessagesPage from './components/Marketplace/Messages';
 import FavoritesPage from './components/Marketplace/Favorites';
@@ -10,15 +9,15 @@ import Cart from './components/Marketplace/Cart';
 import Orders from './components/Marketplace/Orders';
 import Dashboard from './Dashboard';
 
-// GROUP MATE'S IMPORTS
 import AnnouncementsList from './components/Events/AnnouncementsList';
 import CreateAnnouncement from './components/Events/CreateAnnouncement';
 import Notifications from './components/Notifications/Notifications';
 
+import LostAndFound from './LostAndFound';
+
 const API_BASE = 'http://localhost:5000/api';
 
 const styles = {
-  // YOUR BUTTON STYLE (Kept this to ensure centering works)
   headerBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '0.375rem', border: 'none', fontWeight: '600', cursor: 'pointer', fontSize: '1rem', color: 'white', backgroundColor: '#22c55e', transition: 'opacity 0.2s', margin: 0 },
   
   container: { minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex' },
@@ -586,15 +585,16 @@ export default function App() {
             </div>
           )}
 
-          {/* PLACEHOLDER FOR OTHERS */}
-          {['lost-found'].includes(currentPage) && (
-            <div style={styles.pageContainer}>
-              <h1 style={styles.pageTitle}>{currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}</h1>
-              <div style={styles.emptyState}>
-                <p style={{ fontSize: '1.25rem', fontWeight: '600' }}>Coming Soon</p>
-              </div>
-            </div>
-          )}
+      {currentPage === 'lost-found' && <LostAndFound />}
+
+      {['announcements'].includes(currentPage) && ( // Removed 'lost-found' from this list
+        <div style={styles.pageContainer}>
+          <h1 style={styles.pageTitle}>{currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}</h1>
+          <div style={styles.emptyState}>
+            <p style={{ fontSize: '1.25rem', fontWeight: '600' }}>Coming Soon</p>
+          </div>
+        </div>
+      )}
 
         </div>
       </div> 

@@ -1,42 +1,107 @@
 const mongoose = require('mongoose');
 
 const lostAndFoundSchema = new mongoose.Schema({
-  item_id: { 
-    type: String, 
-    unique: true,
-    default: () => `LF-${Date.now()}`
+  type: {
+    type: String,
+    required: true,
+    enum: ['lost', 'found']
   },
-  type: { 
-    type: String, 
-    enum: ['lost', 'found'], 
-    required: true 
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 200
   },
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  category: { type: String, required: true },
-  location: { type: String, required: true },
-  photo: String,
-  
-  // Matches 'user_id' string from your auth system
-  posted_by: { 
-    type: String, 
-    required: true, 
-    ref: 'User' 
+  description: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 1000
   },
-  
-  status: { 
-    type: String, 
-    enum: ['active', 'claimed', 'expired'], 
-    default: 'active' 
+  category: {
+    type: String,
+    required: true,
+    enum: [
+      'Electronics', 'Books', 'Clothing', 'Accessories', 
+      'Keys', 'ID Cards', 'Bags', 'Sports Equipment', 'Other'
+    ]
   },
-  
-  claimed_by: { type: String, ref: 'User' },
-  claimed_at: Date,
-  contact_info: { type: String },
-  views: { type: Number, default: 0 },
-  expires_at: Date
-}, { 
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } 
+  location: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  photo: {
+    type: String,
+    default: null
+  },
+  posted_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['active', 'claimed', 'expired'],
+    default: 'active'
+  },
+  claimed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  claimed_at: {
+    type: Date,
+    default: null
+  },
+  claim_verified: {
+    type: Boolean,
+    default: false
+  },
+  contact_info: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  views: {
+    type: Number,
+    default: 0
+  },
+  expires_at: {
+    type: Date,
+    default: function() {
+      const date = new Date();
+      date.setDate(date.getDate() + 30);
+      return date;
+    }
+  }
+}, {
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
+
+// Indexes
+lostAndFoundSchema.index({ type: 1, status: 1 });
+lostAndFoundSchema.index({ posted_by: 1 });
+lostAndFoundSchema.index({ category: 1 });
+lostAndFoundSchema.index({ created_at: -1 });
+lostAndFoundSchema.index({ title: 'text', description: 'text' });
+
+// Methods
+lostAndFoundSchema.methods.incrementViews = function() {
+  this.views += 1;
+  return this.save();
+};
+
+lostAndFoundSchema.statics.expireOldItems = async function() {
+  const now = new Date();
+  return await this.updateMany(
+    { expires_at: { $lt: now }, status: 'active' },
+    { $set: { status: 'expired' } }
+  );
+};
+
+// Virtuals
+lostAndFoundSchema.set('toJSON', { virtuals: true });
+lostAndFoundSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('LostAndFound', lostAndFoundSchema);
