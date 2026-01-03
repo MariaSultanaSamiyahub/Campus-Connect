@@ -110,6 +110,14 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Check if banned
+    if (user.is_banned) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been banned. Please contact the administrator for more information.'
+      });
+    }
+
     // Check if approved
     if (!user.is_approved) {
       return res.status(403).json({

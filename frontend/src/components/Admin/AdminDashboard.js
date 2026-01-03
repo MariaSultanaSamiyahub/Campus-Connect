@@ -35,6 +35,8 @@ const styles = {
   badgePending: { backgroundColor: '#fef3c7', color: '#92400e' },
   badgeResolved: { backgroundColor: '#dcfce7', color: '#166534' },
   badgeUnderReview: { backgroundColor: '#dbeafe', color: '#1e40af' },
+  badgeBanned: { backgroundColor: '#fee2e2', color: '#991b1b' },
+  badgeActive: { backgroundColor: '#dcfce7', color: '#166534' },
   
   // Button Styles
   button: { padding: '0.5rem 1rem', borderRadius: '0.375rem', border: 'none', fontWeight: '600', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' },
@@ -75,7 +77,8 @@ export default function AdminDashboard() {
   });
   
   // Data
-  const [users, setUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // Store all users
+  const [users, setUsers] = useState([]); // Filtered users for display
   const [flaggedContent, setFlaggedContent] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -89,7 +92,22 @@ export default function AdminDashboard() {
     } else if (currentView === 'moderation') {
       loadFlaggedContent();
     }
-  }, [currentView, filterStatus, searchQuery, userSearchQuery]);
+  }, [currentView, filterStatus, searchQuery]);
+
+  // Filter users when search query changes
+  useEffect(() => {
+    if (currentView === 'users') {
+      if (userSearchQuery.trim()) {
+        const filtered = allUsers.filter(user => 
+          user.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+          user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+        );
+        setUsers(filtered);
+      } else {
+        setUsers(allUsers);
+      }
+    }
+  }, [userSearchQuery, allUsers, currentView]);
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -100,8 +118,8 @@ export default function AdminDashboard() {
   const loadAdminStats = async () => {
     setLoading(true);
     try {
-      // Fetch all stats in parallel
-      const [usersRes, listingsRes, eventsRes, lostFoundRes, flagsRes] = await Promise.all([
+      // Fetch all stats in parallel with error handling for each
+      const [usersRes, listingsRes, eventsRes, lostFoundRes, flagsRes] = await Promise.allSettled([
         fetch(`${API_BASE}/auth/users`, { headers: getAuthHeaders() }),
         fetch(`${API_BASE}/marketplace`, { headers: getAuthHeaders() }),
         fetch(`${API_BASE}/events`, { headers: getAuthHeaders() }),
@@ -109,22 +127,47 @@ export default function AdminDashboard() {
         fetch(`${API_BASE}/admin/flagged-content?status=pending`, { headers: getAuthHeaders() })
       ]);
 
-      const usersData = await usersRes.json();
-      const listingsData = await listingsRes.json();
-      const eventsData = await eventsRes.json();
-      const lostFoundData = await lostFoundRes.json();
-      const flagsData = await flagsRes.json();
+      let totalUsers = 0;
+      let totalListings = 0;
+      let totalEvents = 0;
+      let totalLostFound = 0;
+      let pendingFlags = 0;
+
+      if (usersRes.status === 'fulfilled' && usersRes.value.ok) {
+        const usersData = await usersRes.value.json();
+        totalUsers = Array.isArray(usersData) ? usersData.length : 0;
+      }
+
+      if (listingsRes.status === 'fulfilled' && listingsRes.value.ok) {
+        const listingsData = await listingsRes.value.json();
+        totalListings = listingsData.count || listingsData.data?.length || 0;
+      }
+
+      if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
+        const eventsData = await eventsRes.value.json();
+        totalEvents = eventsData.count || eventsData.data?.length || 0;
+      }
+
+      if (lostFoundRes.status === 'fulfilled' && lostFoundRes.value.ok) {
+        const lostFoundData = await lostFoundRes.value.json();
+        totalLostFound = lostFoundData.count || lostFoundData.data?.length || 0;
+      }
+
+      if (flagsRes.status === 'fulfilled' && flagsRes.value.ok) {
+        const flagsData = await flagsRes.value.json();
+        pendingFlags = flagsData.data?.length || 0;
+      }
 
       setStats({
-        totalUsers: Array.isArray(usersData) ? usersData.length : 0,
-        totalListings: listingsData.count || listingsData.data?.length || 0,
-        totalEvents: eventsData.count || eventsData.data?.length || 0,
-        totalLostFound: lostFoundData.count || lostFoundData.data?.length || 0,
-        pendingFlags: flagsData.data?.length || 0
+        totalUsers,
+        totalListings,
+        totalEvents,
+        totalLostFound,
+        pendingFlags
       });
     } catch (error) {
       console.error('Error loading admin stats:', error);
-      showMessage('error', '❌ Failed to load statistics');
+      showMessage('error', '❌ Failed to load some statistics');
     }
     setLoading(false);
   };
@@ -136,20 +179,24 @@ export default function AdminDashboard() {
       const response = await fetch(`${API_BASE}/auth/users`, { headers: getAuthHeaders() });
       const data = await response.json();
       
-      let usersList = Array.isArray(data) ? data : [];
+      const usersList = Array.isArray(data) ? data : [];
+      setAllUsers(usersList); // Store all users
       
-      // Filter by search query
+      // Apply current search filter
       if (userSearchQuery.trim()) {
-        usersList = usersList.filter(user => 
+        const filtered = usersList.filter(user => 
           user.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
           user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
         );
+        setUsers(filtered);
+      } else {
+        setUsers(usersList);
       }
-      
-      setUsers(usersList);
     } catch (error) {
       console.error('Error loading users:', error);
       showMessage('error', '❌ Failed to load users');
+      setAllUsers([]);
+      setUsers([]);
     }
     setLoading(false);
   };
@@ -228,13 +275,30 @@ export default function AdminDashboard() {
   };
 
   // ✅ ADMIN - Ban/Unban user
-  const toggleUserBan = async (userId, currentStatus) => {
-    const action = currentStatus === 'banned' ? 'unban' : 'ban';
-    if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
+  const toggleUserBan = async (userId, isBanned) => {
+    const action = isBanned ? 'unban' : 'ban';
+    const actionText = isBanned ? 'unban' : 'ban';
+    if (!window.confirm(`Are you sure you want to ${actionText} this user?`)) return;
     
-    // Note: This would require a backend endpoint to ban/unban users
-    // For now, we'll show a message
-    showMessage('info', `⚠️ User ${action} functionality requires backend implementation`);
+    try {
+      const response = await fetch(`${API_BASE}/admin/users/${userId}/ban`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showMessage('success', `✅ User ${actionText}ned successfully`);
+        loadUsers(); // Refresh the user list
+      } else {
+        showMessage('error', `❌ ${data.message || 'Failed to update user ban status'}`);
+      }
+    } catch (error) {
+      console.error('Error toggling user ban:', error);
+      showMessage('error', '❌ Network error');
+    }
   };
 
   const formatDate = (dateString) => {
@@ -362,33 +426,50 @@ export default function AdminDashboard() {
                       <th style={styles.tableHeader}>Name</th>
                       <th style={styles.tableHeader}>Email</th>
                       <th style={styles.tableHeader}>Role</th>
+                      <th style={styles.tableHeader}>Status</th>
                       <th style={styles.tableHeader}>Joined</th>
                       <th style={styles.tableHeader}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(user => (
-                      <tr key={user._id || user.user_id} style={styles.tableRow}>
-                        <td style={styles.tableCell}>{user.name || 'N/A'}</td>
-                        <td style={styles.tableCell}>{user.email || 'N/A'}</td>
-                        <td style={styles.tableCell}>
-                          <span style={{...styles.badge, ...(user.role === 'admin' ? styles.badgeAdmin : styles.badgeUser)}}>
-                            {user.role || 'user'}
-                          </span>
-                        </td>
-                        <td style={styles.tableCell}>
-                          {formatDate(user.created_at || user.createdAt)}
-                        </td>
-                        <td style={styles.tableCell}>
-                          <button
-                            onClick={() => toggleUserBan(user._id || user.user_id, user.status)}
-                            style={{...styles.button, ...styles.buttonRed}}
-                          >
-                            <Ban size={16} /> {user.status === 'banned' ? 'Unban' : 'Ban'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {users.map(user => {
+                      const isBanned = user.is_banned || false;
+                      const isAdmin = user.role === 'admin';
+                      return (
+                        <tr key={user._id || user.user_id} style={styles.tableRow}>
+                          <td style={styles.tableCell}>{user.name || 'N/A'}</td>
+                          <td style={styles.tableCell}>{user.email || 'N/A'}</td>
+                          <td style={styles.tableCell}>
+                            <span style={{...styles.badge, ...(isAdmin ? styles.badgeAdmin : styles.badgeUser)}}>
+                              {user.role || 'user'}
+                            </span>
+                          </td>
+                          <td style={styles.tableCell}>
+                            <span style={{...styles.badge, ...(isBanned ? styles.badgeBanned : styles.badgeActive)}}>
+                              {isBanned ? 'Banned' : 'Active'}
+                            </span>
+                          </td>
+                          <td style={styles.tableCell}>
+                            {formatDate(user.created_at || user.createdAt)}
+                          </td>
+                          <td style={styles.tableCell}>
+                            <button
+                              onClick={() => !isAdmin && toggleUserBan(user._id || user.user_id, isBanned)}
+                              style={{
+                                ...styles.button, 
+                                ...(isBanned ? styles.buttonGreen : styles.buttonRed),
+                                ...(isAdmin ? { opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#9ca3af' } : {}),
+                                transition: 'opacity 0.2s'
+                              }}
+                              disabled={isAdmin}
+                              title={isAdmin ? 'Cannot ban administrators' : isBanned ? 'Click to unban user' : 'Click to ban user'}
+                            >
+                              <Ban size={16} /> {isBanned ? 'Unban' : 'Ban'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -482,15 +563,25 @@ export default function AdminDashboard() {
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => handleFlagAction(flag._id, 'reviewing')}
-                      style={{...styles.button, ...styles.buttonBlue}}
+                      style={{
+                        ...styles.button, 
+                        ...styles.buttonBlue,
+                        ...(flag.status === 'resolved' ? { opacity: 0.5, cursor: 'not-allowed' } : {})
+                      }}
                       disabled={flag.status === 'resolved'}
+                      title={flag.status === 'resolved' ? 'Flag already resolved' : 'Mark as under review'}
                     >
                       <Eye size={16} /> Review
                     </button>
                     <button
                       onClick={() => handleFlagAction(flag._id, 'approved')}
-                      style={{...styles.button, ...styles.buttonGreen}}
+                      style={{
+                        ...styles.button, 
+                        ...styles.buttonGreen,
+                        ...(flag.status === 'resolved' ? { opacity: 0.5, cursor: 'not-allowed' } : {})
+                      }}
                       disabled={flag.status === 'resolved'}
+                      title={flag.status === 'resolved' ? 'Flag already resolved' : 'Approve and resolve flag'}
                     >
                       <CheckCircle size={16} /> Approve
                     </button>
@@ -501,8 +592,13 @@ export default function AdminDashboard() {
                           deleteContent(flag.content_type.toLowerCase(), flag.content_id);
                         }
                       }}
-                      style={{...styles.button, ...styles.buttonRed}}
+                      style={{
+                        ...styles.button, 
+                        ...styles.buttonRed,
+                        ...(flag.status === 'resolved' ? { opacity: 0.5, cursor: 'not-allowed' } : {})
+                      }}
                       disabled={flag.status === 'resolved'}
+                      title={flag.status === 'resolved' ? 'Flag already resolved' : 'Remove content and resolve flag'}
                     >
                       <XCircle size={16} /> Remove
                     </button>

@@ -6,12 +6,17 @@ const Marketplace = require('../models/marketplace');
 const LostAndFound = require('../models/LostAndFound'); 
 const Event = require('../models/Event');
 const FlaggedContent = require('../models/FlaggedContent');
+const User = require('../models/User');
 
 // ✅ DASHBOARD - Get user statistics (finalized implementation)
 router.get('/stats', protect, async (req, res) => {
   try {
     const userId = req.user._id; // Use MongoDB _id for queries
     const userCustomId = req.user.user_id; // Custom user_id for Notification model
+
+    // Get user to check role and rating
+    const user = await User.findById(userId);
+    const isAdmin = user && user.role === 'admin';
 
     const [
       unreadCount, 
@@ -31,7 +36,8 @@ router.get('/stats', protect, async (req, res) => {
 
       Event.countDocuments({ organizer: userId, status: 'upcoming' }),
 
-      FlaggedContent.countDocuments({ status: 'pending' })
+      // Only count pending flags for admins
+      isAdmin ? FlaggedContent.countDocuments({ status: 'pending' }) : Promise.resolve(0)
     ]);
 
     const stats = {
@@ -40,7 +46,8 @@ router.get('/stats', protect, async (req, res) => {
       foundItems: foundCount,
       upcomingEvents,
       unreadNotifications: unreadCount,
-      pendingFlags
+      pendingFlags: isAdmin ? pendingFlags : 0,
+      userRating: user ? (user.rating || 0) : 0
     };
 
     res.json({ success: true, data: stats });

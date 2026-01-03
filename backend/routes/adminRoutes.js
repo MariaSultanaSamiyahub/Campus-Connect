@@ -142,4 +142,48 @@ router.delete('/content/:type/:id', protect, requireAdmin, async (req, res) => {
   }
 });
 
+// PUT /api/admin/users/:id/ban
+// Ban or unban a user (admins cannot ban other admins)
+router.put('/users/:id/ban', protect, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // 'ban' or 'unban'
+
+    // Find the user to ban/unban
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent admins from banning other admins
+    if (targetUser.role === 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Cannot ban other administrators' 
+      });
+    }
+
+    // Update the ban status
+    const isBanned = action === 'ban';
+    targetUser.is_banned = isBanned;
+    await targetUser.save();
+
+    res.json({ 
+      success: true, 
+      message: `User ${isBanned ? 'banned' : 'unbanned'} successfully`,
+      data: {
+        _id: targetUser._id,
+        user_id: targetUser.user_id,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+        is_banned: targetUser.is_banned
+      }
+    });
+  } catch (error) {
+    console.error('Ban user error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update user ban status' });
+  }
+});
+
 module.exports = router;

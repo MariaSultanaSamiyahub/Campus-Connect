@@ -151,7 +151,8 @@ export default function Dashboard() {
     foundItems: 0,
     upcomingEvents: 0,
     unreadNotifications: 0,
-    pendingFlags: 0
+    pendingFlags: 0,
+    userRating: 0
   });
   const [notifications, setNotifications] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -171,7 +172,7 @@ export default function Dashboard() {
     if (currentTab === 'moderation' && isAdmin) {
       loadFlaggedContent();
     }
-  }, [currentTab, filterStatus, searchQuery]);
+  }, [currentTab, filterStatus, searchQuery, isAdmin]);
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -181,72 +182,99 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() });
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
+      const [statsRes, notifsRes, activityRes] = await Promise.allSettled([
+        fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/notifications`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/dashboard/recent-activity`, { headers: getAuthHeaders() })
+      ]);
+
+      if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+        const statsData = await statsRes.value.json();
         setStats(statsData.data || statsData);
+      } else if (statsRes.status === 'fulfilled' && !statsRes.value.ok) {
+        console.error('Failed to load stats');
       }
-      const notifsRes = await fetch(`${API_BASE}/notifications`, { headers: getAuthHeaders() });
-      if (notifsRes.ok) {
-        const notifsData = await notifsRes.json();
+
+      if (notifsRes.status === 'fulfilled' && notifsRes.value.ok) {
+        const notifsData = await notifsRes.value.json();
         setNotifications(notifsData.data || []);
       }
-      const activityRes = await fetch(`${API_BASE}/dashboard/recent-activity`, { headers: getAuthHeaders() });
-      if (activityRes.ok) {
-        const activityData = await activityRes.json();
+
+      if (activityRes.status === 'fulfilled' && activityRes.value.ok) {
+        const activityData = await activityRes.value.json();
         setRecentActivity(activityData.data || []);
       }
     } catch (error) {
       console.error('Error loading dashboard:', error);
-      // Fail silently or show message
+      showMessage('error', 'Failed to load some dashboard data');
     }
     setLoading(false);
   };
 
   const loadFlaggedContent = async () => {
+    setLoading(true);
     try {
       let url = `${API_BASE}/admin/flagged-content?status=${filterStatus}`;
-      if (searchQuery) url += `&search=${searchQuery}`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
       const response = await fetch(url, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         setFlaggedContent(data.data || []);
+      } else {
+        const errorData = await response.json();
+        showMessage('error', errorData.message || 'Failed to load flagged content');
+        setFlaggedContent([]);
       }
     } catch (error) {
       console.error('Error loading flagged content:', error);
+      showMessage('error', 'Network error loading flagged content');
+      setFlaggedContent([]);
     }
+    setLoading(false);
   };
 
   const markNotificationRead = async (notificationId) => {
     try {
-      await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+      const response = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: getAuthHeaders()
       });
-      setNotifications(prev => prev.map(n => 
-        n.notification_id === notificationId ? { ...n, is_read: true } : n
-      ));
-      setStats(prev => ({ 
-        ...prev, 
-        unreadNotifications: Math.max(0, prev.unreadNotifications - 1) 
-      }));
+      
+      if (response.ok) {
+        setNotifications(prev => prev.map(n => 
+          n.notification_id === notificationId ? { ...n, is_read: true } : n
+        ));
+        setStats(prev => ({ 
+          ...prev, 
+          unreadNotifications: Math.max(0, prev.unreadNotifications - 1) 
+        }));
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      // Fail silently - user can try again
     }
   };
 
   const handleFlagAction = async (flagId, action) => {
     try {
-      await fetch(`${API_BASE}/admin/flagged-content/${flagId}`, {
+      const response = await fetch(`${API_BASE}/admin/flagged-content/${flagId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ action })
       });
-      showMessage('success', `✅ Flag ${action} successfully`);
-      loadFlaggedContent();
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showMessage('success', `✅ Flag ${action} successfully`);
+        loadFlaggedContent();
+        loadDashboardData(); // Refresh stats
+      } else {
+        showMessage('error', `❌ ${data.message || 'Failed to update flag'}`);
+      }
     } catch (error) {
       console.error('Error handling flag:', error);
-      showMessage('error', '❌ Failed to update flag');
+      showMessage('error', '❌ Network error');
     }
   };
 
@@ -340,7 +368,9 @@ export default function Dashboard() {
                 </div>
                 <div style={styles.statCard}>
                   <div style={styles.statLabel}>User Rating</div>
-                  <div style={styles.statValue}>4.8 ⭐</div>
+                  <div style={styles.statValue}>
+                    {stats.userRating > 0 ? `${stats.userRating.toFixed(1)} ⭐` : 'N/A'}
+                  </div>
                   <TrendingUp size={32} color="#eab308" style={{ marginTop: '1rem', opacity: 0.8 }} />
                 </div>
               </div>
@@ -452,7 +482,11 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {flaggedContent.length === 0 ? (
+              {loading ? (
+                <div style={styles.card}>
+                  <div style={styles.emptyState}>⏳ Loading flagged content...</div>
+                </div>
+              ) : flaggedContent.length === 0 ? (
                 <div style={styles.card}>
                   <div style={styles.emptyState}>
                     <CheckCircle size={48} color="#22c55e" />
@@ -480,7 +514,7 @@ export default function Dashboard() {
                           {flag.title || 'Flagged Content'}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          Reported by <span style={{ fontWeight: '600' }}>{flag.reported_by}</span>
+                          Reported by <span style={{ fontWeight: '600' }}>{flag.reported_by?.name || flag.reported_by || 'Unknown'}</span>
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
                           {new Date(flag.created_at || flag.createdAt).toLocaleString()}

@@ -49,6 +49,10 @@ const userSchema = new mongoose.Schema({
   is_approved: {
     type: Boolean,
     default: true
+  },
+  is_banned: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
