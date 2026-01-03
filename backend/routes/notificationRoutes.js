@@ -9,23 +9,18 @@ const {
   getUnreadCount
 } = require('../Controllers/notificationController');
 
-// All routes require authentication
 router.use(protect);
 
-// Get user's notifications
 router.get('/', getNotifications);
-
-// Get unread count
 router.get('/unread-count', getUnreadCount);
 
-// Mark notification as read
 router.patch('/:id/read', markAsRead);
+router.put('/:id/read', markAsRead);     // Bridge for dashboard
 
-// Mark all as read
 router.patch('/read-all', markAllAsRead);
+router.put('/read-all', markAllAsRead);  // Bridge for dashboard
 
-// Delete notification
+// DELETE route
 router.delete('/:id', deleteNotification);
 
 module.exports = router;
-
