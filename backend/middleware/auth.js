@@ -30,7 +30,8 @@ exports.protect = async (req, res, next) => {
       _id: user._id,
       user_id: user.user_id,    // Custom user ID
       name: user.name,
-      email: user.email
+      email: user.email,
+      role: user.role           // Add role for admin middleware
     };
     
     next();
