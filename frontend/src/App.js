@@ -13,24 +13,29 @@ import AnnouncementsList from './components/Events/AnnouncementsList';
 import CreateAnnouncement from './components/Events/CreateAnnouncement';
 import Notifications from './components/Notifications/Notifications';
 
+// ✅ NEW IMPORTS - Added these three components
+import EventCard from './components/Events/EventCard';
+import CreateEvent from './components/Events/CreateEvent';
+import MyEvents from './components/Events/MyEvents';
+
 import LostAndFound from './LostAndFound';
 
 const API_BASE = 'http://localhost:5000/api';
 
 const styles = {
   headerBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '0.375rem', border: 'none', fontWeight: '600', cursor: 'pointer', fontSize: '1rem', color: 'white', backgroundColor: '#22c55e', transition: 'opacity 0.2s', margin: 0 },
-  
+ 
   container: { minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex' },
   sidebar: { width: '280px', backgroundColor: '#ffffff', boxShadow: '2px 0 8px rgba(0,0,0,0.1)', height: '100vh', overflowY: 'auto', position: 'sticky', top: 0 },
   sidebarBrand: { padding: '1.5rem', borderBottom: '2px solid #e5e7eb', fontSize: '1.25rem', fontWeight: 'bold', color: '#2563eb' },
   sidebarItem: { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', margin: '0.5rem', borderRadius: '0.375rem', cursor: 'pointer', color: '#4b5563', fontWeight: '500', border: 'none', backgroundColor: 'transparent', width: 'calc(100% - 1rem)', textAlign: 'left', fontSize: '0.95rem' },
   sidebarItemActive: { backgroundColor: '#dbeafe', color: '#2563eb' },
   mainContent: { flex: 1, display: 'flex', flexDirection: 'column' },
-  
+ 
   topBar: { backgroundColor: '#ffffff', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 },
   topBarBrand: { fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' },
   topBarButtons: { display: 'flex', gap: '1rem', alignItems: 'center' },
-  
+ 
   pageContent: { flex: 1, backgroundColor: '#f9fafb', padding: '2rem', overflowY: 'auto' },
   pageContainer: { maxWidth: '1280px', margin: '0 auto' },
   hero: { background: 'linear-gradient(to right, #2563eb, #4f46e5)', color: 'white', padding: '3rem 2rem', borderRadius: '0.5rem', marginBottom: '2rem' },
@@ -68,22 +73,20 @@ export default function App() {
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
-  
-  // MERGED: User State (From Group Mate)
-  const [user, setUser] = useState(null); 
+ 
+  const [user, setUser] = useState(null);
 
   // Events
   const [events, setEvents] = useState([]);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [eventFormData, setEventFormData] = useState({ title: '', description: '', date: '', venue: '', category: 'Other', capacity: '' });
 
-  // MERGED: Announcements & Notifications (From Group Mate)
+  // Announcements & Notifications
   const [announcements, setAnnouncements] = useState([]);
   const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // YOUR: Admin States
-  const [adminView, setAdminView] = useState('main'); 
+  // Admin States
+  const [adminView, setAdminView] = useState('main');
   const [users, setUsers] = useState([]);
 
   const showMessage = (type, text) => {
@@ -134,49 +137,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // --- ACTION FUNCTIONS ---
-
-  const createEvent = async () => {
-    if (!eventFormData.title || !eventFormData.description || !eventFormData.date || !eventFormData.venue) {
-      showMessage('error', '⚠️ Please fill all required fields');
-      return;
-    }
-    try {
-      const payload = { ...eventFormData, capacity: eventFormData.capacity ? parseInt(eventFormData.capacity) : null };
-      const response = await fetch(`${API_BASE}/events`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-      if (response.ok) {
-        showMessage('success', '✅ Event created!');
-        setShowCreateEvent(false);
-        setEventFormData({ title: '', description: '', date: '', venue: '', category: 'Other', capacity: '' });
-        fetchEvents();
-      } else {
-        showMessage('error', '❌ Error creating event');
-      }
-    } catch (error) {
-      showMessage('error', '❌ Error creating event');
-    }
-  };
-
-  const rsvpEvent = async (eventId, status) => {
-    try {
-      const response = await fetch(`${API_BASE}/events/${eventId}/rsvp`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status })
-      });
-      if (response.ok) {
-        showMessage('success', `✅ RSVP ${status}!`);
-        fetchEvents();
-      }
-    } catch (error) {
-      showMessage('error', '❌ Error with RSVP');
-    }
-  };
-
   const handleRegister = async () => {
     if (!registerName || !registerEmail || !registerPassword) {
       showMessage('error', '⚠️ Please fill all fields');
@@ -200,7 +160,7 @@ export default function App() {
       showMessage('error', '❌ Registration failed');
     }
   };
-  
+ 
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       showMessage('error', '⚠️ Please fill all fields');
@@ -216,11 +176,10 @@ export default function App() {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('userId', data.user.user_id);
-        localStorage.setItem('role', data.user.role); 
-        
-        // MERGED: Set User State
+        localStorage.setItem('role', data.user.role);
+       
         setUser(data.user);
-        
+       
         setIsLoggedIn(true);
         setCurrentPage('home');
         showMessage('success', '✅ Login successful!');
@@ -236,7 +195,7 @@ export default function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('role');
-    setUser(null); // MERGED: Clear user state
+    setUser(null);
     setIsLoggedIn(false);
     setAuthPage('login');
     showMessage('success', '✅ Logged out');
@@ -252,12 +211,10 @@ export default function App() {
     if (isLoggedIn && currentPage === 'events') fetchEvents();
   }, [currentPage, isLoggedIn]);
 
-  // MERGED: Fetch announcements and sync user
   useEffect(() => {
     if (isLoggedIn && (currentPage === 'home' || currentPage === 'announcements')) {
       fetchAnnouncements();
-      
-      // If page reloads, user state might be null but token exists. Fetch user data.
+     
       const token = localStorage.getItem('token');
       if (token && !user) {
         fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() })
@@ -317,6 +274,10 @@ export default function App() {
           <button onClick={() => setCurrentPage('marketplace')} style={{...styles.sidebarItem, ...(currentPage === 'marketplace' ? styles.sidebarItemActive : {})}}><ShoppingBag size={20} /> Marketplace</button>
           <button onClick={() => setCurrentPage('lost-found')} style={{...styles.sidebarItem, ...(currentPage === 'lost-found' ? styles.sidebarItemActive : {})}}><AlertCircle size={20} /> Lost & Found</button>
           <button onClick={() => setCurrentPage('events')} style={{...styles.sidebarItem, ...(currentPage === 'events' ? styles.sidebarItemActive : {})}}><Calendar size={20} /> Events</button>
+         
+          {/* ✅ NEW - My Events Button (Added right after Events) */}
+          <button onClick={() => setCurrentPage('my-events')} style={{...styles.sidebarItem, ...(currentPage === 'my-events' ? styles.sidebarItemActive : {})}}><Calendar size={20} /> My Events</button>
+         
           <button onClick={() => setCurrentPage('messages')} style={{...styles.sidebarItem, ...(currentPage === 'messages' ? styles.sidebarItemActive : {})}}><MessageCircle size={20} /> Messages</button>
           <button onClick={() => setCurrentPage('favorites')} style={{...styles.sidebarItem, ...(currentPage === 'favorites' ? styles.sidebarItemActive : {})}}><Heart size={20} /> My Favorites</button>
           <button onClick={() => setCurrentPage('mylistings')} style={{...styles.sidebarItem, ...(currentPage === 'mylistings' ? styles.sidebarItemActive : {})}}><Package size={20} /> My Listings</button>
@@ -327,7 +288,7 @@ export default function App() {
 
       {/* MAIN CONTENT */}
       <div style={styles.mainContent}>
-        {/* TOP BAR - MERGED STYLES */}
+        {/* TOP BAR */}
         <div style={styles.topBar}>
           <div style={styles.topBarBrand}>🏫 Campus Connect</div>
           <div style={styles.topBarButtons}>
@@ -335,15 +296,13 @@ export default function App() {
               <Home size={20} /> Home
             </button>
 
-            {/* MERGED: Notifications Button (Using my headerBtn style for centering) */}
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)} 
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
               style={{...styles.headerBtn, backgroundColor: '#8b5cf6', position: 'relative'}}
             >
               <Bell size={20} /> Notifications
             </button>
-            
-            {/* MERGED: Admin Button (Checks both local storage and user state to be safe) */}
+           
             {(localStorage.getItem('role') === 'admin' || user?.role === 'admin') && (
               <button onClick={() => setCurrentPage('admin')} style={{...styles.headerBtn, backgroundColor: '#8b5cf6'}}>
                 ⚙️ Admin
@@ -356,7 +315,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* MERGED: Notifications Dropdown */}
         {showNotifications && <Notifications onClose={() => setShowNotifications(false)} />}
 
         {/* PAGES */}
@@ -367,7 +325,7 @@ export default function App() {
                 <h1 style={styles.heroTitle}>Welcome to Campus Connect</h1>
                 <p style={{ fontSize: '1.25rem', opacity: 0.9 }}>Your all-in-one platform for campus life</p>
               </div>
-              
+             
               {/* FEATURE GRID */}
               <div style={styles.featureGrid}>
                 {[
@@ -376,7 +334,6 @@ export default function App() {
                   { icon: '🔍', title: 'Lost & Found', desc: 'Search for lost items', page: 'lost-found' },
                   { icon: '📅', title: 'Events', desc: 'Join campus events', page: 'events' },
                   { icon: '💬', title: 'Messages', desc: 'Connect with others', page: 'messages' },
-                  // Check role again for the card
                   ...((localStorage.getItem('role') === 'admin' || user?.role === 'admin') ? [{ icon: '⚙️', title: 'Admin', desc: 'Manage content', page: 'admin' }] : [])
                 ].map((feature, i) => (
                   <div key={i} style={styles.featureCard} onClick={() => setCurrentPage(feature.page)} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
@@ -387,21 +344,21 @@ export default function App() {
                 ))}
               </div>
 
-              {/* MERGED: Announcements List on Home Page */}
+              {/* Announcements List on Home Page */}
               <div style={{ marginTop: '3rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                   <h2 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>📢 Latest Announcements</h2>
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     {(user?.role === 'admin' || localStorage.getItem('role') === 'admin') && (
-                      <button 
-                        onClick={() => setShowCreateAnnouncement(true)} 
+                      <button
+                        onClick={() => setShowCreateAnnouncement(true)}
                         style={{...styles.headerBtn, backgroundColor: '#22c55e'}}
                       >
                         <Plus size={20} /> Create
                       </button>
                     )}
-                    <button 
-                      onClick={() => setCurrentPage('announcements')} 
+                    <button
+                      onClick={() => setCurrentPage('announcements')}
                       style={{...styles.headerBtn, backgroundColor: '#6b7280'}}
                     >
                       View All →
@@ -413,10 +370,10 @@ export default function App() {
                 ) : announcements.length === 0 ? (
                   <div style={styles.emptyState}>No announcements found</div>
                 ) : (
-                  <AnnouncementsList 
-                    announcements={announcements.slice(0, 3)} 
-                    setAnnouncements={setAnnouncements} 
-                    user={user} 
+                  <AnnouncementsList
+                    announcements={announcements.slice(0, 3)}
+                    setAnnouncements={setAnnouncements}
+                    user={user}
                     setMessage={setMessage}
                   />
                 )}
@@ -433,14 +390,14 @@ export default function App() {
           {currentPage === 'favorites' && <FavoritesPage />}
           {currentPage === 'mylistings' && <MyListingsPage />}
 
-          {/* MERGED: Announcements Full Page */}
+          {/* Announcements Full Page */}
           {currentPage === 'announcements' && (
             <div style={styles.pageContainer}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 style={styles.pageTitle}>📢 Announcements</h1>
                 {(user?.role === 'admin' || localStorage.getItem('role') === 'admin') && (
-                  <button 
-                    onClick={() => setShowCreateAnnouncement(true)} 
+                  <button
+                    onClick={() => setShowCreateAnnouncement(true)}
                     style={styles.headerBtn}
                   >
                     <Plus size={20} /> Create Announcement
@@ -451,62 +408,66 @@ export default function App() {
               {loading ? (
                 <div style={styles.emptyState}>⏳ Loading...</div>
               ) : (
-                <AnnouncementsList 
-                  announcements={announcements} 
-                  setAnnouncements={setAnnouncements} 
-                  user={user} 
+                <AnnouncementsList
+                  announcements={announcements}
+                  setAnnouncements={setAnnouncements}
+                  user={user}
                   setMessage={setMessage}
                 />
               )}
             </div>
           )}
 
+          {/* ✅ UPDATED EVENTS PAGE - Now using EventCard and CreateEvent components */}
           {currentPage === 'events' && (
             <div style={styles.pageContainer}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h1 style={styles.pageTitle}>📅 Events</h1>
-                <button onClick={() => setShowCreateEvent(true)} style={styles.headerBtn}><Plus size={20} /> Create</button>
+                <button onClick={() => setShowCreateEvent(true)} style={styles.headerBtn}>
+                  <Plus size={20} /> Create Event
+                </button>
               </div>
+             
               {message.text && <div style={message.type === 'error' ? styles.errorMessage : styles.successMessage}>{message.text}</div>}
-              {loading ? <div style={styles.emptyState}>⏳ Loading...</div> : events.length === 0 ? <div style={styles.emptyState}>No events found</div> : (
-                events.map(event => (
-                  <div key={event._id} style={styles.eventCard}>
-                    <span style={{ display: 'inline-block', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '0.75rem' }}>{event.category}</span>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{event.title}</h3>
-                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '0.5rem' }}>📅 {formatDate(event.date)} | 📍 {event.venue}</p>
-                    <p style={{ color: '#4b5563', marginBottom: '1rem' }}>{event.description.substring(0, 150)}...</p>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button onClick={() => rsvpEvent(event._id, 'interested')} style={{...styles.headerBtn, flex: 1, padding: '0.5rem', margin: 0, fontSize: '0.85rem', backgroundColor: '#fef3c7', color: '#92400e'}}>⭐ Interested</button>
-                      <button onClick={() => rsvpEvent(event._id, 'going')} style={{...styles.headerBtn, flex: 1, padding: '0.5rem', margin: 0, fontSize: '0.85rem'}}>✅ Going</button>
-                    </div>
-                  </div>
-                ))
+             
+              {loading ? (
+                <div style={styles.emptyState}>⏳ Loading...</div>
+              ) : events.length === 0 ? (
+                <div style={styles.emptyState}>No events found</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                  {events.map(event => (
+                    <EventCard
+                      key={event._id}
+                      event={event}
+                      onUpdate={fetchEvents}
+                    />
+                  ))}
+                </div>
               )}
+
+              {/* Create Event Modal */}
               {showCreateEvent && (
                 <div style={styles.authContainer}>
-                  <div style={styles.authCard}>
-                    <h2 style={styles.pageTitle}>Create Event</h2>
-                    {/* Event Form fields... */}
-                    <input placeholder="Title" value={eventFormData.title} onChange={(e) => setEventFormData({...eventFormData, title: e.target.value})} style={styles.formInput} />
-                    <textarea placeholder="Description" value={eventFormData.description} onChange={(e) => setEventFormData({...eventFormData, description: e.target.value})} style={{...styles.formInput, minHeight: '100px'}} />
-                    <input placeholder="Date & Time" type="datetime-local" value={eventFormData.date} onChange={(e) => setEventFormData({...eventFormData, date: e.target.value})} style={styles.formInput} />
-                    <input placeholder="Venue" value={eventFormData.venue} onChange={(e) => setEventFormData({...eventFormData, venue: e.target.value})} style={styles.formInput} />
-                    <select value={eventFormData.category} onChange={(e) => setEventFormData({...eventFormData, category: e.target.value})} style={styles.formInput}>
-                      <option value="Other">Other</option>
-                      <option value="Academic">Academic</option>
-                      <option value="Sports">Sports</option>
-                      <option value="Cultural">Cultural</option>
-                    </select>
-                    <input placeholder="Capacity (optional)" type="number" value={eventFormData.capacity} onChange={(e) => setEventFormData({...eventFormData, capacity: e.target.value})} style={styles.formInput} />
-                    <button onClick={createEvent} style={styles.submitBtn}>Create</button>
-                    <button onClick={() => setShowCreateEvent(false)} style={{...styles.submitBtn, backgroundColor: '#9ca3af', marginBottom: 0}}>Cancel</button>
+                  <div style={{ ...styles.authCard, maxWidth: '600px' }}>
+                    <CreateEvent
+                      onClose={() => setShowCreateEvent(false)}
+                      onSuccess={() => {
+                        setShowCreateEvent(false);
+                        fetchEvents();
+                        showMessage('success', '✅ Event created!');
+                      }}
+                    />
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* YOUR: ADMIN DASHBOARD */}
+          {/* ✅ NEW - My Events Page */}
+          {currentPage === 'my-events' && <MyEvents />}
+
+          {/* ADMIN DASHBOARD */}
           {currentPage === 'admin' && (
             <div style={styles.pageContainer}>
                <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem'}}>
@@ -585,22 +546,13 @@ export default function App() {
             </div>
           )}
 
-      {currentPage === 'lost-found' && <LostAndFound />}
-
-      {['announcements'].includes(currentPage) && ( // Removed 'lost-found' from this list
-        <div style={styles.pageContainer}>
-          <h1 style={styles.pageTitle}>{currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}</h1>
-          <div style={styles.emptyState}>
-            <p style={{ fontSize: '1.25rem', fontWeight: '600' }}>Coming Soon</p>
-          </div>
-        </div>
-      )}
+          {currentPage === 'lost-found' && <LostAndFound />}
 
         </div>
-      </div> 
+      </div>
 
-      {/* MERGED: Create Announcement Modal (Global) */}
-      {showCreateAnnouncement && currentPage !== 'announcements' && (
+      {/* Create Announcement Modal (Global) */}
+      {showCreateAnnouncement && (
         <CreateAnnouncement
           onClose={() => setShowCreateAnnouncement(false)}
           onSuccess={() => {
@@ -611,6 +563,6 @@ export default function App() {
         />
       )}
 
-    </div> 
+    </div>
   );
 }

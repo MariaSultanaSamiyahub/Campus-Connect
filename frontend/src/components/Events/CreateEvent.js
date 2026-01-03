@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createEvent } from '../../services/eventService';
 import './Events.css';
 
-const CreateEvent = () => {
-  const navigate = useNavigate();
+const API_BASE = 'http://localhost:5000/api';
+
+const CreateEvent = ({ onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -14,6 +13,14 @@ const CreateEvent = () => {
     category: 'Other',
     capacity: ''
   });
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  };
 
   const categories = ['Academic', 'Cultural', 'Sports', 'Workshop', 'Seminar', 'Social', 'Other'];
 
@@ -38,9 +45,19 @@ const CreateEvent = () => {
         capacity: formData.capacity ? parseInt(formData.capacity) : null
       };
       
-      await createEvent(eventData);
-      alert('Event created successfully!');
-      navigate('/events');
+      const response = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(eventData)
+      });
+
+      if (response.ok) {
+        alert('Event created successfully!');
+        onSuccess();
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to create event');
+      }
     } catch (error) {
       alert(error.message || 'Failed to create event');
     } finally {
@@ -139,7 +156,7 @@ const CreateEvent = () => {
           <button
             type="button"
             className="btn-cancel"
-            onClick={() => navigate('/events')}
+            onClick={onClose}
           >
             Cancel
           </button>

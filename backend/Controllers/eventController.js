@@ -182,7 +182,7 @@ exports.deleteEvent = async (req, res) => {
 // @access  Private
 exports.rsvpEvent = async (req, res) => {
   try {
-    const { status } = req.body; // 'interested' or 'going'
+    const { status } = req.body;
     const event = await Event.findById(req.params.id);
 
     if (!event) {
@@ -192,7 +192,6 @@ exports.rsvpEvent = async (req, res) => {
       });
     }
 
-    // Check if event is full
     if (event.isFull()) {
       return res.status(400).json({
         success: false,
@@ -200,18 +199,17 @@ exports.rsvpEvent = async (req, res) => {
       });
     }
 
-    // Check if user already RSVP'd
+    // ✅ CHANGED: Use _id (ObjectId) instead of id (string)
     const alreadyRSVP = event.attendees.find(
-      attendee => attendee.user.toString() === req.user.id
+      attendee => attendee.user.toString() === req.user._id.toString()
     );
 
     if (alreadyRSVP) {
-      // Update existing RSVP status
       alreadyRSVP.status = status || 'interested';
     } else {
-      // Add new RSVP
+      // ✅ CHANGED: Use _id (ObjectId) instead of id (string)
       event.attendees.push({
-        user: req.user.id,
+        user: req.user._id,  // Use ObjectId, not string
         status: status || 'interested'
       });
     }
@@ -245,9 +243,9 @@ exports.cancelRSVP = async (req, res) => {
       });
     }
 
-    // Remove user from attendees
+    // ✅ CHANGED: Use _id (ObjectId) instead of id (string)
     event.attendees = event.attendees.filter(
-      attendee => attendee.user.toString() !== req.user.id
+      attendee => attendee.user.toString() !== req.user._id.toString()
     );
 
     await event.save();
@@ -270,9 +268,10 @@ exports.cancelRSVP = async (req, res) => {
 // @access  Private
 exports.getMyEvents = async (req, res) => {
   try {
+    // ✅ CHANGED: Use _id (ObjectId) instead of id (string)
     const events = await Event.find({
-      'attendees.user': req.user.id,
-      date: { $gte: new Date() } // Only upcoming events
+      'attendees.user': req.user._id,  // Use ObjectId, not string
+      date: { $gte: new Date() }
     })
       .populate('organizer', 'name email')
       .sort({ date: 1 });

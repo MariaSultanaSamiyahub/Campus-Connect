@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { getMyEvents } from '../../services/eventService';
 import EventCard from './EventCard';
 import './Events.css';
+
+const API_BASE = 'http://localhost:5000/api';
 
 const MyEvents = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  };
 
   useEffect(() => {
     fetchMyEvents();
@@ -15,10 +24,26 @@ const MyEvents = () => {
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
-      const data = await getMyEvents();
-      setEvents(data.data);
+      
+      // ✅ Use the actual backend endpoint
+      const response = await fetch(`${API_BASE}/events/my-events`, {
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch your events');
+      }
+
+      const data = await response.json();
+      
+      console.log('✅ My Events Response:', data);
+      console.log('Number of events:', data.count);
+      
+      setEvents(data.data || []);
       setError('');
     } catch (err) {
+      console.error('❌ Error fetching my events:', err);
       setError(err.message || 'Failed to fetch your events');
     } finally {
       setLoading(false);
@@ -60,7 +85,7 @@ const MyEvents = () => {
 
       {loading ? (
         <div className="loading">
-          <p>Loading your events...</p>
+          <p>⏳ Loading your events...</p>
         </div>
       ) : (
         <>
@@ -71,7 +96,11 @@ const MyEvents = () => {
                   <h2 className="calendar-date">{date}</h2>
                   <div className="event-grid">
                     {dateEvents.map((event) => (
-                      <EventCard key={event._id} event={event} onUpdate={fetchMyEvents} />
+                      <EventCard 
+                        key={event._id} 
+                        event={event} 
+                        onUpdate={fetchMyEvents} 
+                      />
                     ))}
                   </div>
                 </div>
@@ -81,6 +110,21 @@ const MyEvents = () => {
             <div className="no-events">
               <p>📅 No upcoming events</p>
               <p>Browse events and RSVP to see them here!</p>
+              <button 
+                onClick={fetchMyEvents}
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                🔄 Refresh
+              </button>
             </div>
           )}
         </>

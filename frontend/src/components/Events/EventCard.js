@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { rsvpEvent, cancelRSVP } from '../../services/eventService';
 import './Events.css';
 
-const EventCard = ({ event, onUpdate }) => {
-  const navigate = useNavigate();
+const API_BASE = 'http://localhost:5000/api';
+
+const EventCard = ({ event, onUpdate, onViewDetails }) => {
   const [loading, setLoading] = useState(false);
   const userId = localStorage.getItem('userId');
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  };
 
   // Check if user has RSVP'd
   const userRSVP = event.attendees?.find(
@@ -34,14 +41,23 @@ const EventCard = ({ event, onUpdate }) => {
   const handleRSVP = async (status) => {
     if (!userId) {
       alert('Please login to RSVP');
-      navigate('/login');
       return;
     }
 
     try {
       setLoading(true);
-      await rsvpEvent(event._id, status);
-      onUpdate(); // Refresh events
+      const response = await fetch(`${API_BASE}/events/${event._id}/rsvp`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh events
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to RSVP');
+      }
     } catch (error) {
       alert(error.message || 'Failed to RSVP');
     } finally {
@@ -52,17 +68,22 @@ const EventCard = ({ event, onUpdate }) => {
   const handleCancelRSVP = async () => {
     try {
       setLoading(true);
-      await cancelRSVP(event._id);
-      onUpdate(); // Refresh events
+      const response = await fetch(`${API_BASE}/events/${event._id}/rsvp`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        onUpdate(); // Refresh events
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to cancel RSVP');
+      }
     } catch (error) {
       alert(error.message || 'Failed to cancel RSVP');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleViewDetails = () => {
-    navigate(`/events/${event._id}`);
   };
 
   return (
@@ -78,7 +99,11 @@ const EventCard = ({ event, onUpdate }) => {
         )}
       </div>
 
-      <h3 className="event-title" onClick={handleViewDetails}>
+      <h3 
+        className="event-title" 
+        onClick={() => onViewDetails && onViewDetails(event)}
+        style={{ cursor: onViewDetails ? 'pointer' : 'default' }}
+      >
         {event.title}
       </h3>
 
@@ -97,7 +122,7 @@ const EventCard = ({ event, onUpdate }) => {
         </div>
         <div className="event-detail-item">
           <span className="icon">👤</span>
-          <span>{event.organizerName}</span>
+          <span>{event.organizerName || event.organizer?.name || 'Organizer'}</span>
         </div>
       </div>
 
