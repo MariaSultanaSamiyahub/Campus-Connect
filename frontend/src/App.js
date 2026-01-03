@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Home, LogOut, Megaphone, ShoppingBag,ShoppingCart , AlertCircle, Calendar, MessageCircle, Plus, Heart, Package } from 'lucide-react';
+import { Home, LogOut, Megaphone, ShoppingBag,ShoppingCart , AlertCircle, Calendar, MessageCircle, Plus, Heart, Package, Bell } from 'lucide-react';
 import Marketplace from './components/Marketplace/Marketplace';
 import MessagesPage from './components/Marketplace/Messages';
 import FavoritesPage from './components/Marketplace/Favorites';
 import MyListingsPage from './components/Marketplace/MyListings';
 import Cart from './components/Marketplace/Cart';
 import Orders from './components/Marketplace/Orders';
+import AnnouncementsList from './components/Events/AnnouncementsList';
+import CreateAnnouncement from './components/Events/CreateAnnouncement';
+import Notifications from './components/Notifications/Notifications';
 
 
 const API_BASE = 'http://localhost:5000/api';
@@ -77,6 +80,12 @@ export default function App() {
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [eventFormData, setEventFormData] = useState({ title: '', description: '', date: '', venue: '', category: 'Other', capacity: '' });
 
+  // Announcements - NEW
+  const [announcements, setAnnouncements] = useState([]);
+  const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
+  const [user, setUser] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+
   // const categories = ['Books', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Sports', 'Other'];
   // const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
@@ -133,6 +142,19 @@ export default function App() {
       setEvents(data.data || []);
     } catch (error) {
       showMessage('error', '❌ Cannot fetch events');
+    }
+    setLoading(false);
+  };
+
+  // NEW: Fetch Announcements Function
+  const fetchAnnouncements = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/announcements`);
+      const data = await response.json();
+      setAnnouncements(data.data || []);
+    } catch (error) {
+      showMessage('error', '❌ Cannot fetch announcements');
     }
     setLoading(false);
   };
@@ -221,6 +243,7 @@ export default function App() {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('userId', data.user.user_id);
+        setUser(data.user); // NEW: Set user state
         setIsLoggedIn(true);
         setCurrentPage('home');
         showMessage('success', '✅ Login successful!');
@@ -235,6 +258,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
+    setUser(null); // NEW: Clear user state
     setIsLoggedIn(false);
     setAuthPage('login');
     showMessage('success', '✅ Logged out');
@@ -246,6 +270,21 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn && currentPage === 'events') fetchEvents();
+  }, [currentPage, isLoggedIn]);
+
+  // NEW: Fetch announcements on home page and announcements page
+  useEffect(() => {
+    if (isLoggedIn && (currentPage === 'home' || currentPage === 'announcements')) {
+      fetchAnnouncements();
+      // Fetch user info if needed
+      const token = localStorage.getItem('token');
+      if (token && !user) {
+        fetch(`${API_BASE}/auth/me`, { headers: getAuthHeaders() })
+          .then(res => res.json())
+          .then(data => { if (data.success) setUser(data.user); })
+          .catch(console.error);
+      }
+    }
   }, [currentPage, isLoggedIn]);
 
   // LOGIN
@@ -311,10 +350,19 @@ export default function App() {
           <div style={styles.topBarBrand}>🏫 Campus Connect</div>
           <div style={styles.topBarButtons}>
             <button onClick={() => setCurrentPage('home')} style={{...styles.submitBtn, width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Home size={20} /> Home</button>
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)} 
+              style={{...styles.submitBtn, width: 'auto', margin: 0, backgroundColor: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative'}}
+            >
+              <Bell size={20} /> Notifications
+            </button>
             <button onClick={() => setCurrentPage('admin')} style={{...styles.submitBtn, width: 'auto', margin: 0, backgroundColor: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>⚙️ Admin</button>
             <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={20} /> Logout</button>
           </div>
         </div>
+
+        {/* Notifications Dropdown - NEW */}
+        {showNotifications && <Notifications onClose={() => setShowNotifications(false)} />}
 
         {/* PAGES */}
         <div style={styles.pageContent}>
@@ -339,6 +387,42 @@ export default function App() {
                     <p style={{ color: '#6b7280' }}>{feature.desc}</p>
                   </div>
                 ))}
+              </div>
+
+              {/* ANNOUNCEMENTS SECTION - NEW */}
+              <div style={{ marginTop: '3rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h2 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>📢 Latest Announcements</h2>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {user?.role === 'admin' && (
+                      <button 
+                        onClick={() => setShowCreateAnnouncement(true)} 
+                        style={{...styles.submitBtn, width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}
+                      >
+                        <Plus size={20} /> Create Announcement
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setCurrentPage('announcements')} 
+                      style={{...styles.submitBtn, width: 'auto', margin: 0, backgroundColor: '#6b7280', display: 'flex', alignItems: 'center', gap: '0.5rem'}}
+                    >
+                      View All →
+                    </button>
+                  </div>
+                </div>
+                {message.text && <div style={message.type === 'error' ? styles.errorMessage : styles.successMessage}>{message.text}</div>}
+                {loading ? (
+                  <div style={styles.emptyState}>⏳ Loading announcements...</div>
+                ) : announcements.length === 0 ? (
+                  <div style={styles.emptyState}>No announcements found</div>
+                ) : (
+                  <AnnouncementsList 
+                    announcements={announcements.slice(0, 3)} 
+                    setAnnouncements={setAnnouncements} 
+                    user={user} 
+                    setMessage={setMessage}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -445,7 +529,45 @@ export default function App() {
             </div>
           )}
 
-          {['announcements', 'lost-found', 'admin'].includes(currentPage) && (
+          {/* ANNOUNCEMENTS PAGE - UPDATED */}
+          {currentPage === 'announcements' && (
+            <div style={styles.pageContainer}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h1 style={styles.pageTitle}>📢 Announcements</h1>
+                {user?.role === 'admin' && (
+                  <button 
+                    onClick={() => setShowCreateAnnouncement(true)} 
+                    style={{...styles.submitBtn, width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}
+                  >
+                    <Plus size={20} /> Create Announcement
+                  </button>
+                )}
+              </div>
+              {message.text && <div style={message.type === 'error' ? styles.errorMessage : styles.successMessage}>{message.text}</div>}
+              {loading ? (
+                <div style={styles.emptyState}>⏳ Loading...</div>
+              ) : (
+                <AnnouncementsList 
+                  announcements={announcements} 
+                  setAnnouncements={setAnnouncements} 
+                  user={user} 
+                  setMessage={setMessage}
+                />
+              )}
+              {showCreateAnnouncement && (
+                <CreateAnnouncement
+                  onClose={() => setShowCreateAnnouncement(false)}
+                  onSuccess={() => {
+                    setShowCreateAnnouncement(false);
+                    fetchAnnouncements();
+                    showMessage('success', '✅ Announcement created!');
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {['lost-found', 'admin'].includes(currentPage) && (
             <div style={styles.pageContainer}>
               <h1 style={styles.pageTitle}>{currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}</h1>
               <div style={styles.emptyState}>
@@ -453,8 +575,20 @@ export default function App() {
               </div>
             </div>
           )}
-         </div>
+        </div>
       </div>
+
+      {/* CREATE ANNOUNCEMENT MODAL - NEW (Global modal, appears on any page) */}
+      {showCreateAnnouncement && currentPage !== 'announcements' && (
+        <CreateAnnouncement
+          onClose={() => setShowCreateAnnouncement(false)}
+          onSuccess={() => {
+            setShowCreateAnnouncement(false);
+            fetchAnnouncements();
+            showMessage('success', '✅ Announcement created!');
+          }}
+        />
+      )}
     </div>
   );
 }
