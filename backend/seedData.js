@@ -2,10 +2,11 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('./models/User');
-const MarketplaceListing = require('./models/MarketplaceListing');
+const { MarketplaceListing } = require('./models/marketplace');
 const LostAndFound = require('./models/LostAndFound');
 const Announcement = require('./models/Announcement');
 const Event = require('./models/Event');
+const Notification = require('./models/Notification');
 
 const bcrypt = require('bcryptjs');
 
@@ -271,6 +272,10 @@ Object.entries(categories).forEach(([category, items]) => {
       const price = getRandomInt(priceRange[0], priceRange[1]);
       const condition = getRandomElement(item.condition);
       
+      // Generate placeholder image URLs
+      const imageUrl = `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 1000)}`;
+      const thumbnailUrl = `https://picsum.photos/200/150?random=${Math.floor(Math.random() * 1000)}`;
+      
       listings.push({
         listing_id: generateListingId(),
         title: item.name,
@@ -279,13 +284,16 @@ Object.entries(categories).forEach(([category, items]) => {
         price: price,
         condition: condition,
         location: getRandomElement(locations),
+        images: [imageUrl],
+        thumbnail: thumbnailUrl,
+        stock: getRandomInt(1, 5),
+        quantity: 1,
         status: Math.random() > 0.1 ? 'active' : 'sold', // 90% active
         seller_id: seller.user_id,
         seller: {
           user_id: seller.user_id,
           name: seller.name,
-          email: seller.email,
-          rating: seller.rating
+          email: seller.email
         },
         view_count: getRandomInt(5, 200),
         is_featured: Math.random() > 0.9, // 10% featured
@@ -311,26 +319,30 @@ const lostFoundItems = [
   { type: 'found', title: 'USB Flash Drive', category: 'Electronics', location: 'Library' }
 ];
 
+// Map categories to valid enum values
+const categoryMap = {
+  'Personal Items': 'Accessories',
+  'Electronics': 'Electronics',
+  'Books': 'Books',
+  'Clothing': 'Clothing',
+  'Keys': 'Keys',
+  'ID Cards': 'ID Cards',
+  'Bags': 'Bags',
+  'Sports Equipment': 'Sports Equipment',
+  'Other': 'Other'
+};
+
 const lostAndFoundData = [];
 for (let i = 0; i < 4; i++) { // 4x each item
   lostFoundItems.forEach(item => {
     const poster = getRandomElement(users);
     lostAndFoundData.push({
-      item_id: generateItemId(),
       type: item.type,
       title: item.title,
       description: `${item.type === 'lost' ? 'Lost' : 'Found'} ${item.title}. Please contact if you have information.`,
-      category: item.category,
+      category: categoryMap[item.category] || 'Other',
       location: item.location,
-      date: getRandomDate(-getRandomInt(1, 30)).toISOString().split('T')[0],
-      status: Math.random() > 0.3 ? 'open' : 'claimed', // 70% open
-      is_claimed: Math.random() < 0.3,
-      posted_by: poster.user_id,
-      poster: {
-        user_id: poster.user_id,
-        name: poster.name,
-        email: poster.email
-      },
+      status: Math.random() > 0.3 ? 'active' : 'claimed', // 70% active
       contact_info: poster.email,
       expires_at: getRandomDate(30)
     });
@@ -340,17 +352,18 @@ for (let i = 0; i < 4; i++) { // 4x each item
 // ============================================
 // ANNOUNCEMENTS (25 announcements)
 // ============================================
+// Valid categories: 'Academic', 'General', 'Event', 'Important', 'Other'
 const announcementTemplates = [
-  { title: 'Campus Maintenance Notice', category: 'Maintenance', dept: 'Facilities' },
+  { title: 'Campus Maintenance Notice', category: 'General', dept: 'Facilities' },
   { title: 'Holiday Schedule Update', category: 'Academic', dept: 'Administration' },
-  { title: 'New Parking Regulations', category: 'Campus Life', dept: 'Security' },
-  { title: 'Career Fair Next Week', category: 'Events', dept: 'Career Services' },
+  { title: 'New Parking Regulations', category: 'Important', dept: 'Security' },
+  { title: 'Career Fair Next Week', category: 'Event', dept: 'Career Services' },
   { title: 'Library Hours Extended', category: 'Academic', dept: 'Library' },
-  { title: 'Campus WiFi Upgrade', category: 'Technology', dept: 'IT Services' },
-  { title: 'Student Health Center Hours', category: 'Health', dept: 'Health Services' },
-  { title: 'Scholarship Application Deadline', category: 'Financial', dept: 'Financial Aid' },
+  { title: 'Campus WiFi Upgrade', category: 'General', dept: 'IT Services' },
+  { title: 'Student Health Center Hours', category: 'Important', dept: 'Health Services' },
+  { title: 'Scholarship Application Deadline', category: 'Important', dept: 'Financial Aid' },
   { title: 'Guest Lecture Series', category: 'Academic', dept: 'Computer Science' },
-  { title: 'Sports Tournament Registration', category: 'Sports', dept: 'Athletics' }
+  { title: 'Sports Tournament Registration', category: 'Event', dept: 'Athletics' }
 ];
 
 const announcements = [];
@@ -361,7 +374,7 @@ announcementTemplates.forEach((template, index) => {
   for (let i = 0; i < getRandomInt(2, 3); i++) {
     const author = getRandomElement(admins);
     announcements.push({
-      item_id: generateAnnouncementId(),
+      announcement_id: generateAnnouncementId(),
       title: template.title,
       content: `Important update regarding ${template.title.toLowerCase()}. Please read carefully and take necessary action. More details will be provided soon.`,
       category: template.category,
@@ -450,20 +463,72 @@ async function seedDatabase() {
 
     // Insert lost and found items (if model exists)
     if (LostAndFound) {
-      const createdLostFound = await LostAndFound.insertMany(lostAndFoundData);
+      // Map user_id to ObjectId for posted_by
+      const lostFoundWithObjectIds = lostAndFoundData.map(item => {
+        const poster = createdUsers.find(u => u.email === item.contact_info) || createdUsers[0];
+        return {
+          ...item,
+          posted_by: poster._id
+        };
+      });
+      const createdLostFound = await LostAndFound.insertMany(lostFoundWithObjectIds);
       console.log(`✅ Created ${createdLostFound.length} lost & found items`);
     }
 
     // Insert announcements (if model exists)
+    let createdAnnouncements = [];
     if (Announcement) {
-      const createdAnnouncements = await Announcement.insertMany(announcements);
+      createdAnnouncements = await Announcement.insertMany(announcements);
       console.log(`✅ Created ${createdAnnouncements.length} announcements`);
     }
 
     // Insert events (if model exists)
     if (Event) {
-      const createdEvents = await Event.insertMany(events);
+      // Fix event structure to match model
+      const formattedEvents = events.map(event => ({
+        title: event.title,
+        description: event.description,
+        date: event.date,
+        venue: event.location,
+        organizer: createdUsers.find(u => u.user_id === event.organizer)?._id || createdUsers[0]._id,
+        organizerName: event.organizer_info.name,
+        category: event.category || 'Other',
+        capacity: event.capacity,
+        status: 'upcoming'
+      }));
+      const createdEvents = await Event.insertMany(formattedEvents);
       console.log(`✅ Created ${createdEvents.length} events`);
+    }
+
+    // Create notifications for some announcements
+    const notificationPromises = [];
+    if (createdAnnouncements && createdAnnouncements.length > 0) {
+      const sampleAnnouncement = createdAnnouncements[0];
+      const usersToNotify = createdUsers.slice(0, 10); // Notify first 10 users
+      
+      for (const user of usersToNotify) {
+        notificationPromises.push(
+          Notification.create({
+            notification_id: `NOTIF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            user_id: user.user_id,
+            type: 'announcement',
+            title: `📢 ${sampleAnnouncement.title}`,
+            message: sampleAnnouncement.content.substring(0, 200),
+            reference_type: 'announcement',
+            reference_id: sampleAnnouncement.announcement_id,
+            priority: sampleAnnouncement.is_pinned ? 'urgent' : 'normal',
+            user: {
+              user_id: user.user_id,
+              email: user.email
+            }
+          })
+        );
+      }
+    }
+    
+    if (notificationPromises.length > 0) {
+      await Promise.all(notificationPromises);
+      console.log(`✅ Created ${notificationPromises.length} notifications`);
     }
 
     console.log('\n🎉 Database seeded successfully!');
